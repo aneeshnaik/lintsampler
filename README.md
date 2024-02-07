@@ -1,1 +1,1 @@
-# nlintersample
+# gridsample
