@@ -68,14 +68,22 @@ def choose_gridcells(*edgearrays, corner_densities,
                      N_cells=None, seed=None):
     """From k-dimensional grid of densities, choose mass-weighted cell(s).
 
-    DESCRIPTION.
+    Given a k-dimensional grid, shaped (N0 x N1 x ... x N{k-1}), the user
+    specifies a sequence of k 1D arrays (lengths N0+1, N1+1, etc.) representing
+    the (not necessarily evenly spaced) gridlines along each dimension, and a
+    kD array (shape N0+1 x N1+1 x ...) representing the densities at the grid
+    corners. This function then calculates the mass of each grid cell according
+    to the trapezoid rule (i.e., the average density over all 2**k corners times
+    the volume of the cell), then randomly chooses a cell (or several cell) from
+    the set of cells, weighting each cell by its mass in this choice.
 
     Parameters
     ----------
     *edgearrays : 1 or more 1D numpy arrays
         k arrays representing 'edge lines' of k-dimensional grid. E.g., if grid
         is 3D and shaped N0 x N1 x N2, then provide 3 1D arrays, shaped (N0+1,),
-        (N1+1,), (N2+1,) respectively.
+        (N1+1,), (N2+1,) respectively. The edges do *not* need to be evenly
+        spaced.
     corner_densities : k-dim numpy array, shape (N0+1 x N1+1 x ... x N{k-1}+1)
         Grid of densities evaluated at corners of k-dimensional grid.
     N_cells : int, optional
