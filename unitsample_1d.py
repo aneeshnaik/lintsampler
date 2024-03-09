@@ -78,6 +78,7 @@ def unitsample_1d(f0, f1, seed=None):
         cell), otherwise 1D array if f0/f1 1D arrays (representing batch of
         cells).
     """
+    # if densities scalar, pass to unbatched function
     if not hasattr(f0, "__len__"):
         return _unitsample_1d_single(f0, f1, seed)
 
