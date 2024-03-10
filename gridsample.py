@@ -35,10 +35,10 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
 
     Returns
     -------
-    samples : 1D numpy array shape (k) or 2D numpy array, shape (N_samples, k)
-        Sample(s) from linear interpolant on k-dimensional grid. Single sample
-        if N_samples=None (default), otherwise batch of samples. Note that if
-        N_samples is set explicitly to 1 then returned samples is shaped (1, k).
+    X : scalar, 1D array (length k OR N_samples) or 2D array (N_samples, k)
+        Sample(s) from linear interpolant. Scalar if single sample (i.e.,
+        N_samples is None) in 1D. 1D array if single sample in k-D OR multiple
+        samples in 1D. 2D array if multiple samples in k-D.
     """
     # check inputs all sensible
     if len(edgearrays) != f.ndim:
@@ -62,19 +62,25 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
     corners = _gridcell_corners(f, cells)
 
     # sample on unit hypercube
-    samples = unitsample_kd(*corners, seed=rng)
+    z = unitsample_kd(*corners, seed=rng)
 
     # rescale coordinates (loop over dimensions)
     for d in range(f.ndim):
         e = edgearrays[d]
         if N_samples:
             c = cells[:, d]
-            samples[:, d] = e[c] + np.diff(e)[c] * samples[:, d]
+            z[:, d] = e[c] + np.diff(e)[c] * z[:, d]
         else:
             c = cells[d]
-            samples[d] = e[c] + np.diff(e)[c] * samples[d]
+            z[d] = e[c] + np.diff(e)[c] * z[d]
 
-    return samples
+    # squeeze down to scalar / 1D if appropriate
+    if not N_samples and (f.ndim == 1):
+        z = z.item()
+    elif (f.ndim == 1):
+        z = z[:, 0]
+
+    return z
 
 
 def _gridcell_faverages(f):

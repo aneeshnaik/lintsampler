@@ -35,7 +35,7 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
 
     Returns
     -------
-    z : scalar, 1D array (length k OR N_samples) or 2D array (N_samples, k)
+    X : scalar, 1D array (length k OR N_samples) or 2D array (N_samples, k)
         Sample(s) from linear interpolant. Scalar if single sample (i.e.,
         N_samples is None) in 1D. 1D array if single sample in k-D OR multiple
         samples in 1D. 2D array if multiple samples in k-D.
@@ -79,6 +79,7 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     # draw samples
     z = x0 + (x1 - x0) * unitsample_kd(*f, seed=rng)
 
+    # squeeze down to scalar / 1D if appropriate
     if not N_samples and (k == 1):
         z = z.item()
     elif (k == 1):
