@@ -220,7 +220,7 @@ def _gridcell_corners(f, cells):
 
     Parameters
     ----------
-    corner_densities : k-dim numpy array, shape (N0+1 x N1+1 x ... x N{k-1}+1)
+    f : k-dim numpy array, shape (N0+1 x N1+1 x ... x N{k-1}+1)
         Grid of densities evaluated at corners of k-dimensional grid.
     cells : 2-d numpy array, shape (N, k)
         Grid indices of N chosen cells along the k dimensions of the grid.
