@@ -47,7 +47,7 @@ def _unitsample_1d_single(f0, f1, seed=None):
     return z
 
 
-def unitsample_1d(f0, f1, seed=None):
+def _unitsample_1d(f0, f1, seed=None):
     """Batched sampling from 1D linear interpolant between x=0 and 1.
     
     f0 and f1 are numpy arrays length N, representing densities at x=0 and x=1

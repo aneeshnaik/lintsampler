@@ -1,6 +1,6 @@
 import numpy as np
 from functools import reduce
-from .unitsample_kd import unitsample_kd
+from .unitsample_kd import _unitsample_kd
 
 
 def gridsample(*edgearrays, f, N_samples=None, seed=None):
@@ -62,7 +62,7 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
     corners = _gridcell_corners(f, cells)
 
     # sample on unit hypercube
-    z = unitsample_kd(*corners, seed=rng)
+    z = _unitsample_kd(*corners, seed=rng)
 
     # rescale coordinates (loop over dimensions)
     for d in range(f.ndim):

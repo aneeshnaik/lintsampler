@@ -1,7 +1,6 @@
 import numpy as np
 from math import log2
-from .unitsample_kd import unitsample_kd
-from .unitsample_1d import unitsample_1d
+from .unitsample_kd import _unitsample_kd
 
 
 def sample(x0, x1, *f, N_samples=None, seed=None):
@@ -77,7 +76,7 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     f = tuple([fi[c] for fi in f])
     
     # draw samples
-    z = x0 + (x1 - x0) * unitsample_kd(*f, seed=rng)
+    z = x0 + (x1 - x0) * _unitsample_kd(*f, seed=rng)
 
     # squeeze down to scalar / 1D if appropriate
     if not N_samples and (k == 1):

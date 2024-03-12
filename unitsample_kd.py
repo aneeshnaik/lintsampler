@@ -1,7 +1,7 @@
 import numpy as np
 from math import log2
 from .utils import _multiply_array_slice
-from .unitsample_1d import unitsample_1d
+from .unitsample_1d import _unitsample_1d
 
 
 def _unitsample_kd_single(*f, seed=None):
@@ -76,7 +76,7 @@ def _unitsample_kd_single(*f, seed=None):
     return sample
 
 
-def unitsample_kd(*f, seed=None):
+def _unitsample_kd(*f, seed=None):
     """Batched sampling from linear interpolant in k-dimensional unit hypercube.
     
     f is either a series of 2^k scalars or 2^k 1D numpy arrays, each length N,
@@ -143,6 +143,6 @@ def unitsample_kd(*f, seed=None):
         f0, f1 = np.sum(freduced, axis=tuple(range(d)))
 
         # get samples
-        samples[:, d] = unitsample_1d(f0, f1, seed=rng)
+        samples[:, d] = _unitsample_1d(f0, f1, seed=rng)
 
     return samples
