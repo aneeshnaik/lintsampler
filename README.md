@@ -2,7 +2,7 @@
 
 **Efficient generation of random variates via linear interpolant sampling.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/aneeshnaik/lintsampler/blob/main/LICENSE)
 [![Documentation Status](https://readthedocs.org/projects/lintsampler/badge/?version=latest)](https://lintsampler.readthedocs.io/en/latest/?badge=latest)
 
 When you know densities on the $2^k$ vertices of a $k$-dimensional hyperbox (or a series of such hyperboxes, e.g., the cells of a $k$-dimensional grid), linear interpolant sampling provides a technique to draw samples within the hyperbox. `lintsampler` provides a Python implementation of this.
