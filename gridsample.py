@@ -241,11 +241,17 @@ def _gridcell_corners(f, cells):
     # infer dimensionality from shape of corner density grid
     ndim = f.ndim
     
-    # get array of densities cell corners, initially has shaped (2^k, N_samples)
+    # get loop over 2^k corners, get densities at each
     corners = []
     for i in range(2**ndim):
+        
+        # binary representation of corner, e.g. [0,0,...,0] is first corner
         n = np.binary_repr(i, width=ndim)
         n = np.array([int(c) for c in n], dtype=int)
-        idxi = cells + n
-        corners.append(f[*idxi.T])
+ 
+        # get densities on given corners
+        idx = cells + n
+        idx = np.split(idx.T, ndim)
+        idx = tuple([idxi.squeeze() for idxi in idx])
+        corners.append(f[idx])
     return tuple(corners)
