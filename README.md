@@ -1,1 +1,1 @@
-# gridsample
+# lintsampler
