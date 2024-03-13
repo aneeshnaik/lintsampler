@@ -4,12 +4,12 @@ from .unitsample_kd import _unitsample_kd
 
 
 def gridsample(*edgearrays, f, N_samples=None, seed=None):
-    """Batch sample from density function defined on k-dimensional grid.
+    """Draw sample(s) from density function defined on k-D grid.
     
-    Given a k-dimensional grid, shaped (N0 x N1 x ... x N{k-1}), the user
-    specifies a sequence of k 1D arrays (lengths N0+1, N1+1, etc.) representing
-    the (not necessarily evenly spaced) gridlines along each dimension, and a
-    kD array (shape N0+1 x N1+1 x ...) representing the (not necessarily
+    Given a k-dimensional grid shaped :math:`(N_0, N_1, ..., N_{k-1})`, the user
+    specifies a sequence of k 1D arrays (lengths :math:`N_0+1, N_1+1`, etc.)
+    representing the (not necessarily evenly spaced) gridlines along each
+    dimension, and a kD array shaped :math:`(N_0+1, N_1+1, ...)` representing the (not necessarily
     normalised) densities at the grid corners. This function then draws a sample
     (or N samples) from this grid. It first chooses a cell (or N cells with
     replacement), weighting them by their mass (estimated by the trapezoid rule)
@@ -17,21 +17,21 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
 
     Parameters
     ----------
-    *edgearrays : 1 or more 1D numpy arrays
+    *edgearrays : one or more 1D array_like
         k arrays representing 'edge lines' of k-dimensional grid. E.g., if grid
         is 3D and shaped N0 x N1 x N2, then provide 3 1D arrays, shaped (N0+1,),
         (N1+1,), (N2+1,) respectively. The edges do *not* need to be evenly
         spaced.
-    f : k-dim numpy array, shape (N0+1 x N1+1 x ... x N{k-1}+1)
-        Grid of densities evaluated at corners of k-dimensional grid.
-    N_samples : int, optional
-        Number of samples to draw. Default is None, in which case single sample
-        is drawn.
-    seed : None/int/numpy random Generator, optional
-        Seed for numpy random generator. Can be random generator itself, in
+    f : k-D array_like, shape (N0+1 x N1+1 x ... x N{k-1}+1)
+        Grid of densities evaluated at vertices of k-dimensional grid.
+    N_samples : {None, int}, optional
+        Number of samples to draw. Default is None, in which case a single
+        sample is drawn.
+    seed : {None, int, ``numpy.random.Generator``}, optional
+        Seed for ``numpy`` random generator. Can be random generator itself, in
         which case it is left unchanged. Default is None, in which case new
-        default generator is created. See numpy random generator docs for more
-        information.
+        default generator is created. See ``numpy`` random generator docs for
+        more information.
 
     Returns
     -------
@@ -39,6 +39,59 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
         Sample(s) from linear interpolant. Scalar if single sample (i.e.,
         N_samples is None) in 1D. 1D array if single sample in k-D OR multiple
         samples in 1D. 2D array if multiple samples in k-D.
+    
+    Examples
+    --------
+    
+    These examples demonstrate the multiple ways to use ``gridsample``. In
+    each case, we'll just generate densities from a uniform distribution, but
+    in general they might come from any arbitrary density function.
+
+    1. A single sample from a 1D grid. The grid spans x=0 to x=10, and has 32
+    cells (so 33 edges). 
+    
+    >>> x = np.linspace(0, 10, 33)
+    >>> f = np.random.uniform(size=33)
+    >>> gridsample(x, f=f)
+    0.7355598727871656
+
+    This returns a single scalar: the sampling point within the grid.
+    
+    2. Multiple samples from a 1D grid (same grid as previous example).
+    
+    >>> x = np.linspace(0, 10, 33)
+    >>> f = np.random.uniform(size=33)
+    >>> gridsample(x, f=f, N_samples=4)
+    array([0.7432799 , 6.64118763, 9.65968316, 5.39087554])
+
+    This returns a 1D array: the ``N_samples`` sampling points within the grid.
+
+    3. Single sample from a k-D grid. In this case we'll take a 2D grid, with
+    32 x 64 cells (so 33 gridlines along one axis and 65 along the other, and
+    33x65=2145 intersections with known densities).
+    
+    >>> x = np.linspace(0, 10, 33)
+    >>> y = np.linspace(100, 200, 65)
+    >>> f = np.random.uniform(size=(33, 65))
+    >>> gridsample(x, y, f=f)
+    array([  7.67294632, 190.45302915])
+
+    This returns a 1D array: the single k-D sampling point within the grid.
+
+    4. Multiple samples from a k-D grid (same grid as previous example).
+    
+    >>> x = np.linspace(0, 10, 33)
+    >>> y = np.linspace(100, 200, 65)
+    >>> f = np.random.uniform(size=(33, 65))
+    >>> gridsample(x, y, f=f, N_samples=5)
+    array([[1.35963966e-01, 1.38182930e+02],
+           [6.52704300e+00, 1.63109912e+02],
+           [4.35226761e+00, 1.49753235e+02],
+           [3.56093155e+00, 1.48548481e+02],
+           [1.31163401e+00, 1.59335676e+02]])
+
+    This returns a 2D array, shape ``N_samples`` x k: the ``N_samples`` k-D
+    samples within the grid.
     """
     # check inputs all sensible
     if len(edgearrays) != f.ndim:

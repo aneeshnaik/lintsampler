@@ -21,7 +21,7 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     *f : 2^k scalars or 2^k 1D array_like, length N.
         Densities at cell corners. Each f should be scalar is considering single
         cell or 1D array if considering series of cells.
-    N_samples : int, optional
+    N_samples : {None, int}, optional
         Number of samples to draw. Default is None, in which case a single
         sample is drawn.
     seed : {None, int, ``numpy.random.Generator``}, optional
@@ -40,7 +40,9 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     Examples
     --------
     By combining input types in various ways, there are essentially 6 ways to
-    use ``sample``.
+    use ``sample``. We will see each of these in the following examples. In
+    each case, we'll just generate densities from a uniform distribution, but
+    in general they might come from any arbitrary density function.
     
     1. A single sample from a single 1D cell. Because this is 1D, ``x0`` and
     ``x1`` can be specified as scalars rather than arrays (the latter being the
