@@ -5,3 +5,4 @@ dependencies:
   - sphinx
   - sphinx-book-theme
   - numpy
+  - numpydoc
