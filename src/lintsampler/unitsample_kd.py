@@ -71,7 +71,7 @@ def _unitsample_kd_single(*f, seed=None):
         f0, f1 = np.sum(freduced, axis=tuple(range(d)))
 
         # get samples
-        sample[d] = unitsample_1d(f0, f1, seed=rng)
+        sample[d] = _unitsample_1d(f0, f1, seed=rng)
 
     return sample
 
