@@ -1,0 +1,4 @@
+``gridsample``
+==============
+
+.. autofunction:: lintsampler.gridsample
