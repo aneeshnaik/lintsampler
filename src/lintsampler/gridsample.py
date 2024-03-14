@@ -9,11 +9,12 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
     Given a k-dimensional grid shaped :math:`(N_0, N_1, ..., N_{k-1})`, the user
     specifies a sequence of k 1D arrays (lengths :math:`N_0+1, N_1+1`, etc.)
     representing the (not necessarily evenly spaced) gridlines along each
-    dimension, and a kD array shaped :math:`(N_0+1, N_1+1, ...)` representing the (not necessarily
-    normalised) densities at the grid corners. This function then draws a sample
-    (or N samples) from this grid. It first chooses a cell (or N cells with
-    replacement), weighting them by their mass (estimated by the trapezoid rule)
-    then samples from k-linear interpolant within the chosen cell(s).
+    dimension, and a kD array shaped :math:`(N_0+1, N_1+1, ...)` representing
+    the (not necessarily normalised) densities at the grid corners. This
+    function then draws a sample (or N samples) from this grid. It first chooses
+    a cell (or N cells with replacement), weighting them by their mass
+    (estimated by the trapezoid rule) then samples from k-linear interpolant
+    within the chosen cell(s).
 
     Parameters
     ----------
@@ -23,7 +24,8 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
         (N1+1,), (N2+1,) respectively. The edges do *not* need to be evenly
         spaced.
     f : k-D array_like, shape (N0+1 x N1+1 x ... x N{k-1}+1)
-        Grid of densities evaluated at vertices of k-dimensional grid.
+        Grid of densities evaluated at vertices of k-dimensional grid. Densities
+        should all be positive.
     N_samples : {None, int}, optional
         Number of samples to draw. Default is None, in which case a single
         sample is drawn.

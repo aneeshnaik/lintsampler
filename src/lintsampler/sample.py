@@ -20,7 +20,8 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
         series of 1D cells, need shape (N, 1), not (N).
     *f : 2^k scalars or 2^k 1D array_like, length N.
         Densities at cell corners. Each f should be scalar is considering single
-        cell or 1D array if considering series of cells.
+        cell or 1D array if considering series of cells. Densities should all be
+        positive.
     N_samples : {None, int}, optional
         Number of samples to draw. Default is None, in which case a single
         sample is drawn.
