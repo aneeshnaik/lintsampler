@@ -34,7 +34,7 @@ jobs:
           coveralls --service=github
     
   coverall:
-    needs: tests
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Setup Python
