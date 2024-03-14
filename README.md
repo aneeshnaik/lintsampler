@@ -2,7 +2,7 @@
 
 **Efficient random sampling via linear interpolation.**
 
-![Test](https://github.com/aneeshnaik/lintsampler/actions/workflows/test.yaml/badge.svg)
+[![Test](https://github.com/aneeshnaik/lintsampler/actions/workflows/test.yaml/badge.svg)](https://github.com/aneeshnaik/lintsampler/actions/workflows/test.yaml)
 [![Documentation Status](https://readthedocs.org/projects/lintsampler/badge/?version=latest)](https://lintsampler.readthedocs.io/en/latest/?badge=latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/aneeshnaik/lintsampler/blob/main/LICENSE)
 
