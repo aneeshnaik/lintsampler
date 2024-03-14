@@ -95,9 +95,14 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
     This returns a 2D array, shape ``N_samples`` x k: the ``N_samples`` k-D
     samples within the grid.
     """
-    # check inputs all sensible
-    if len(edgearrays) != f.ndim:
-        raise ValueError("No. of edge arrays doesn't match density grid.")
+    # check N_samples is None or int
+    if (N_samples is not None):
+        if not isinstance(N_samples, int):
+            raise TypeError(f"Expected int N_samples, got {type(N_samples)}")
+        elif N_samples <= 0:
+            raise ValueError(f"Expected positive N_samples, got {N_samples}")
+
+    # check edge arrs 1D, mono. increasing, and match corresponding f dim
     for i, a in enumerate(edgearrays):
         if a.ndim != 1:
             raise TypeError("Expected 1D edge arrays.")
@@ -106,6 +111,17 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
                 "Length of edge array doesn't match corresponding "
                 "density grid dimension."
             )
+        if np.any(np.diff(a) <= 0):
+            raise ValueError("Edge array not monotically increasing.")
+            
+    # check densities positive everywhere
+    if np.any(f < 0):
+        raise ValueError("Densities can't be negative")
+
+    # check shapes of edge arrays / f make sense
+    if f.shape != tuple(len(a) for a in edgearrays):
+        raise ValueError("Shape of densities doesn't match edge array lengths.")
+    
     
     # prepare RNG
     rng = np.random.default_rng(seed)
@@ -239,18 +255,6 @@ def _gridcell_choice(*edgearrays, f, N_cells=None, seed=None):
         Indices along each dimension of randomly sampled cells. 2D if N_cells is
         set with an integer (including 1), 1D if N_cells is set to None.
     """
-    # check shapes of edge arrays and density array all make sense
-    if len(edgearrays) != f.ndim:
-        raise ValueError("No. of edge arrays doesn't match density grid.")
-    for i, a in enumerate(edgearrays):
-        if a.ndim != 1:
-            raise TypeError("Expected 1D edge arrays.")
-        if len(a) != f.shape[i]:
-            raise ValueError(
-                "Length of edge array doesn't match corresponding "
-                "density grid dimension."
-            )
-    
     # prepare RNG
     rng = np.random.default_rng(seed)
     
