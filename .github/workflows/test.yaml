@@ -25,6 +25,8 @@ jobs:
       - name: Test with pytest  
         run: |  
           coverage run -m pytest  -v -s  
-      - name: Generate Coverage Report  
-        run: |  
-          coverage report -m
+      - name: Send coverage data to coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          coveralls --service=github
