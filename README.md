@@ -2,8 +2,9 @@
 
 **Efficient random sampling via linear interpolation.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/aneeshnaik/lintsampler/blob/main/LICENSE)
+[![Test](https://github.com/aneeshnaik/lintsampler/actions/workflows/test.yaml/badge.svg)](https://github.com/aneeshnaik/lintsampler/actions/workflows/test.yaml)
 [![Documentation Status](https://readthedocs.org/projects/lintsampler/badge/?version=latest)](https://lintsampler.readthedocs.io/en/latest/?badge=latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/aneeshnaik/lintsampler/blob/main/LICENSE)
 
 When you know densities on the 2 endpoints of 1D interval, or the 4 corners of a 2D rectangle, or generally the $2^k$ vertices of a $k$-dimensional hyperbox (or a series of such hyperboxes, e.g., the cells of a $k$-dimensional grid), linear interpolant sampling provides a technique to draw random samples within the hyperbox. `lintsampler` provides a Python implementation of this.
 
