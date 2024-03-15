@@ -138,6 +138,11 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     # check requested no. samples is None or positive int
     _check_N_samples(N_samples)
     
+    # check densities positive everywhere
+    for fi in f:
+        if np.any(fi < 0):
+            raise ValueError("Densities can't be negative")
+    
     # if x0/x1 scalar (1D coords) then promote to single-element 1D array
     if not hasattr(x0, "__len__"):
         x0 = np.array([x0])
@@ -151,6 +156,10 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     # if densities scalars (no batching), promote to single-element 1D array
     if not hasattr(f[0], "__len__"):
         f = tuple([np.array([fi]) for fi in f])
+
+    # check x1 > x0 everywhere
+    if np.any(x1 <= x0):
+        raise ValueError("Need x1 > x0 everywhere")
 
     # check x0/x1 have same shape
     if x0.shape != x1.shape:

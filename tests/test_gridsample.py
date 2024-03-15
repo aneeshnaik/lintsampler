@@ -97,6 +97,9 @@ def test_same_int_seed(x_edges, f_1D):
     x1 = gridsample(x_edges, f=f_1D, seed=42)
     x2 = gridsample(x_edges, f=f_1D, seed=42)
     assert x1==x2
+    x1 = gridsample(x_edges, f=f_1D, N_samples=10, seed=42)
+    x2 = gridsample(x_edges, f=f_1D, N_samples=10, seed=42)
+    assert np.all(x1==x2)
 
 
 def test_same_rng_seed(x_edges, f_1D):
@@ -104,6 +107,9 @@ def test_same_rng_seed(x_edges, f_1D):
     x1 = gridsample(x_edges, f=f_1D, seed=np.random.default_rng(42))
     x2 = gridsample(x_edges, f=f_1D, seed=np.random.default_rng(42))
     assert x1==x2
+    x1 = gridsample(x_edges, f=f_1D, N_samples=10, seed=np.random.default_rng(42))
+    x2 = gridsample(x_edges, f=f_1D, N_samples=10, seed=np.random.default_rng(42))
+    assert np.all(x1==x2)
 
 
 ## OUTPUT SHAPES ###############################################################
