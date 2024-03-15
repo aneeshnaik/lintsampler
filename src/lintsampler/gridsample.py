@@ -1,6 +1,7 @@
 import numpy as np
 from functools import reduce
 from .unitsample_kd import _unitsample_kd
+from .utils import _check_N_samples
 
 
 def gridsample(*edgearrays, f, N_samples=None, seed=None):
@@ -95,12 +96,8 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
     This returns a 2D array, shape ``N_samples`` x k: the ``N_samples`` k-D
     samples within the grid.
     """
-    # check N_samples is None or int
-    if (N_samples is not None):
-        if not isinstance(N_samples, int):
-            raise TypeError(f"Expected int N_samples, got {type(N_samples)}")
-        elif N_samples <= 0:
-            raise ValueError(f"Expected positive N_samples, got {N_samples}")
+    # check requested no. samples is None or positive int
+    _check_N_samples(N_samples)
 
     # check edge arrs 1D, mono. increasing, and match corresponding f dim
     for i, a in enumerate(edgearrays):

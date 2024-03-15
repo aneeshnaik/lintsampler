@@ -1,6 +1,7 @@
 import numpy as np
 from math import log2
 from .unitsample_kd import _unitsample_kd
+from .utils import _check_N_samples
 
 
 def sample(x0, x1, *f, N_samples=None, seed=None):
@@ -134,6 +135,9 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     ``N_samples`` sampling points, drawn from across the k-D sampling space
     spanned by the series of specified cells.
     """
+    # check requested no. samples is None or positive int
+    _check_N_samples(N_samples)
+    
     # if x0/x1 scalar (1D coords) then promote to single-element 1D array
     if not hasattr(x0, "__len__"):
         x0 = np.array([x0])

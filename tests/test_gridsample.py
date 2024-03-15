@@ -25,7 +25,7 @@ def f_2D():
     return rng.uniform(size=(33, 65))
 
 
-## INPUTS CHECKING #############################################################
+## INPUT CHECKING ##############################################################
 
 
 def test_bad_seed(x_edges, f_1D):
