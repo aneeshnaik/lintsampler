@@ -191,6 +191,19 @@ def test_shape_multi_sample_multi_1D(x0_batch_1d, x1_batch_1d, f_batch_1d):
 ## OUTPUT VALUES ###############################################################
 
 
+def test_1D_uniform_single():
+    """Test that single uniform sample is in appropriate range."""    
+    x = sample(15, 25, 0.5, 0.5)
+    assert (x < 25) and (x > 15)
+
+
+def test_1D_uniform():
+    """Test that batch of uniform samples gives flat histogram."""    
+    x = sample(15, 25, 0.5, 0.5, N_samples=1000000)
+    p = np.histogram(x, np.linspace(15, 25, 11), density=True)[0]
+    assert np.all(np.round(p, decimals=1) == 0.1)
+    
+
 def test_1D_GMM():
     """Test samples from 1D 2-component GMM have correct means and widths."""
     # true params

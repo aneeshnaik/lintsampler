@@ -29,19 +29,7 @@ def _unitsample_kd_single(*f, seed=None):
     samples : 1D array shape (k)
         Sample from k-linear interpolant.
 
-    """
-    
-    # check appropriate number of densities given
-    if len(f) == 0:
-        raise ValueError("Expected corner densities f.")
-    if (len(f) & (len(f)-1) != 0):
-        raise ValueError("Expected no. corner densities to be power of 2.")
-    
-    # check f all scalars
-    for fi in f:
-        if hasattr(fi, "__len__"):
-            raise TypeError("Expected scalar f.")
-        
+    """        
     # prepare RNG
     rng = np.random.default_rng(seed)
     
@@ -102,13 +90,7 @@ def _unitsample_kd(*f, seed=None):
     samples : 1D array shape (k) or 2D array, shape (N, k)
         Sample or batch of samples from k-linear interpolant.
 
-    """
-    # check appropriate number of densities given
-    if len(f) == 0:
-        raise ValueError("Expected corner densities f.")
-    if (len(f) & (len(f)-1) != 0):
-        raise ValueError("Expected no. corner densities to be power of 2.")
-    
+    """    
     # if densities scalar, pass to unbatched function
     if not hasattr(f[0], "__len__"):
         return _unitsample_kd_single(*f, seed=seed)

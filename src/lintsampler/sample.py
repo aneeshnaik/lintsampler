@@ -157,13 +157,9 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     if not hasattr(f[0], "__len__"):
         f = tuple([np.array([fi]) for fi in f])
 
-    # check x1 > x0 everywhere
+    # check x1 > x0 everywhere (also implictly checks same shape)
     if np.any(x1 <= x0):
         raise ValueError("Need x1 > x0 everywhere")
-
-    # check x0/x1 have same shape
-    if x0.shape != x1.shape:
-        raise ValueError("x0/x1 have different shapes")
 
     # infer dimensionality and batch size
     Nb, k = x0.shape
@@ -228,12 +224,6 @@ def _cell_choice(x0, x1, *f, N_cells=None, seed=None):
         Indices along each dimension of randomly sampled cells. 2D if N_cells is
         set with an integer (including 1), 1D if N_cells is set to None.
     """
-    # check appropriate number of densities given
-    if len(f) == 0:
-        raise ValueError("Expected corner densities f.")
-    if (len(f) & (len(f)-1) != 0):
-        raise ValueError("Expected no. corner densities to be power of 2.")
-        
     # prepare RNG
     rng = np.random.default_rng(seed)
     

@@ -29,10 +29,6 @@ def _unitsample_1d_single(f0, f1, seed=None):
         Sample from linear interpolant.
 
     """
-    # check f0/f1 scalars
-    if hasattr(f0, "__len__") or hasattr(f1, "__len__"):
-        raise TypeError("Expected scalar f0/f1.")
-
     # prepare RNG
     rng = np.random.default_rng(seed)
     
