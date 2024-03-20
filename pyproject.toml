@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lintsampler"
+authors = [
+  { name="Aneesh P. Naik", email="aneesh.naik@roe.ac.uk" },
+]
+description = "Efficient random sampling via linear interpolation."
+readme = "README.md"
+requires-python = ">=3.6"
+dependencies = [
+  "numpy>=1.17",
+]
+keywords = ["python", "statistics", "numpy", "sampling", "random"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/aneeshnaik/lintsampler"
+Documentation = "https://lintsampler.readthedocs.io"
+
+[tool.setuptools.dynamic]
+version = {attr = "lintsampler.__version__"}
