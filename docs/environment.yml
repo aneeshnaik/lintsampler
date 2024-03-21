@@ -6,7 +6,7 @@ dependencies:
   - sphinx-book-theme
   - numpy
   - numpydoc
-  - myst-nb
+  - myst-nb=1.0.0
   - lintsampler
   - matplotlib
   - scipy
