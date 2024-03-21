@@ -29,5 +29,3 @@ The source code is a public repository on `GitHub <https://github.com/aneeshnaik
    :caption: Examples
 
    examples/1_gmm
-   examples/2_doughnuts
-   examples/3_dark_matter
