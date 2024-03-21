@@ -9,6 +9,7 @@ Installation
 
     pip install lintsampler
 
+
 - ``conda``
 
 .. code-block:: sh

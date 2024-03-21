@@ -23,10 +23,3 @@ The source code is a public repository on `GitHub <https://github.com/aneeshnaik
    gridsample
    attribution
    license
-
-
-.. image:: https://img.shields.io/badge/GitHub-aneeshnaik%2Flintsampler-blue.svg?style=flat
-    :target: https://github.com/aneeshnaik/lintsampler
-.. image:: https://img.shields.io/badge/license-MIT-yellow.svg?style=flat
-    :target: https://github.com/aneeshnaik/lintsampler/blob/main/LICENSE
-
