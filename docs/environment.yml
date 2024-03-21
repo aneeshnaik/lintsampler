@@ -7,3 +7,7 @@ dependencies:
   - numpy
   - numpydoc
   - myst-nb
+  - lintsampler
+  - matplotlib
+  - scipy
+  - scikit-learn
