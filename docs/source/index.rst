@@ -23,3 +23,9 @@ The source code is a public repository on `GitHub <https://github.com/aneeshnaik
    gridsample
    attribution
    license
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Examples
+
+   examples/1_placeholder

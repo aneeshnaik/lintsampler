@@ -6,3 +6,4 @@ dependencies:
   - sphinx-book-theme
   - numpy
   - numpydoc
+  - myst-nb
