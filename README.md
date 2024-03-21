@@ -9,11 +9,27 @@
 
 When you know densities on the 2 endpoints of 1D interval, or the 4 corners of a 2D rectangle, or generally the $2^k$ vertices of a $k$-dimensional hyperbox (or a series of such hyperboxes, e.g., the cells of a $k$-dimensional grid), linear interpolant sampling provides a technique to draw random samples within the hyperbox. `lintsampler` provides a Python implementation of this.
 
-See the documentation or the linear interpolant sampling paper for further details. 
+See the [documentation](https://lintsampler.readthedocs.io/) or the linear interpolant sampling paper for further details. 
 
 ## Documentation
 
-The documentation is available at [https://lintsampler.readthedocs.io/](http://lintsampler.readthedocs.io/).
+The documentation, including some example notebooks, is available at [lintsampler.readthedocs.io/](https://lintsampler.readthedocs.io/).
+
+## Installation
+
+Three ways of installing `lintsampler`:
+
+- `pip`:
+```
+pip install lintsampler
+```
+
+- `conda`:
+```
+conda install -c conda-forge lintsampler
+```
+
+- Simply cloning this repository.
 
 ## Attribution
 
