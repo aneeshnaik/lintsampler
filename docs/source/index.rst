@@ -25,7 +25,9 @@ The source code is a public repository on `GitHub <https://github.com/aneeshnaik
    license
 
 .. toctree::
+   :hidden:
    :maxdepth: 1
    :caption: Examples
 
    examples/1_gmm
+   examples/2_doughnuts
