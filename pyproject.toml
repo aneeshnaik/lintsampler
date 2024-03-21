@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -27,5 +27,4 @@ dynamic = ["version"]
 Homepage = "https://github.com/aneeshnaik/lintsampler"
 Documentation = "https://lintsampler.readthedocs.io"
 
-[tool.setuptools.dynamic]
-version = {attr = "lintsampler.__version__"}
+[tool.setuptools_scm]
