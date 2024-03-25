@@ -1,0 +1,9 @@
+text.usetex : False
+font.family : serif
+font.serif : Nimbus Roman, Times New Roman
+font.size : 12
+ytick.labelsize : 11
+xtick.labelsize : 11
+figure.titlesize: 12
+figure.titleweight: bold
+axes.titlesize: 9

@@ -9,7 +9,7 @@ extensions = ['sphinx.ext.autodoc', 'numpydoc', 'myst_nb']
 templates_path = ['_templates']
 exclude_patterns = []
 html_theme = 'sphinx_book_theme'
-html_static_path = ['_static']
+html_theme_options = {"use_sidenotes": True}
 myst_enable_extensions = [
     "amsmath",
     "dollarmath",

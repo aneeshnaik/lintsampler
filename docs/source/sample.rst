@@ -1,4 +1,0 @@
-``sample``
-==========
-
-.. autofunction:: lintsampler.sample
