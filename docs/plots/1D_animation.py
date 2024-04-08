@@ -5,8 +5,6 @@ from scipy.stats import norm
 plt.style.use('figstyle.mplstyle')
 
 
-
-
 if __name__ == "__main__":
     
     N_SAMPLES = 1000

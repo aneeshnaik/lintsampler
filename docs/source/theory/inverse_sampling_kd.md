@@ -21,10 +21,39 @@ Looping back through these distributions, we can derive a cascade of conditional
 \end{split}
 \end{align}
 
-Then, to draw a sample $\mathbf{X}\sim p(\mathbf{x})$, we first draw a 1D sample along the first dimension $X_0 \sim p(x_0)$ using the univariate sampling procedure described above. Next, we draw a second 1D sample $X_1 \sim p(x_1 | x_0=X_0)$, then $X_2 \sim p(x_2 | x_0=X_0, x_1=X_1)$, and so on until the dimensions are exhausted.[^dimdep] This process is visualised below.
+Then, to draw a sample $\mathbf{X}\sim p(\mathbf{x})$, we first draw a 1D sample along the first dimension $X_0 \sim p(x_0)$ using the univariate sampling procedure described above. Next, we draw a second 1D sample $X_1 \sim p(x_1 | x_0=X_0)$, then $X_2 \sim p(x_2 | x_0=X_0, x_1=X_1)$, and so on until the dimensions are exhausted.[^dimdep] We'll illustrate this process with an example. For simplicity of visualisation we'll take a 2D example, but the process works in any number of dimensions.
 
-**ANIMATION GOES HERE**
+For our 2D PDF, we'll take a 2-dimensional Gaussian with mean at $(1.5, -0.5)$ and a covariance matrix given by
+\begin{equation}
+   \Sigma \equiv
+      \begin{pmatrix}
+      \Sigma_{xx} & \Sigma_{xy}\\
+      \Sigma_{yx} & \Sigma_{yy}
+      \end{pmatrix} =
+      \begin{pmatrix}
+      1.0 & 1.2\\
+      1.2 & 1.8
+      \end{pmatrix}.
+\end{equation}
+There are two things to note about this covariance matrix. First, the $\Sigma_{yy}$ component is a little larger than the $\Sigma_{xx}$ element, which means the overall spread in the random variable $y$ is expected to be larger than the overall spread in $x$. Second, the off-diagonal elements are non-zero which means there is a correlation between the two variables, in this case positive. We can visualise the PDF with a contour plot, which illustrates both of these features:
+```{figure} ../assets/2D_pdf.png
+:align: center
+```
+Walking outwards from the centre, the four contour lines here are the 1-, 2-, 3-, and 4-$\sigma$ contours.
 
+We're going to use a really important property of the multivariate Gaussian distribution: marginal distributions of the multivariate Gaussian are themselves Gaussian. 
+
+```{figure} ../assets/2D_marginal.png
+:align: center
+```
+
+```{figure} ../assets/2D_conditional.png
+:align: center
+```
+
+```{figure} ../assets/2D_animation.gif
+:align: center
+```
 As in the univariate case, when the quantile functions for all of the conditional distributions are known, this procedure is an extremely rapid way of generating multivariate samples. However, when this is not the case and the quantile function is to be obtained numerically, the computational expense of the $k$-dimensional numerical integration grows rapidly with the number of dimensions.
 
 [^dimdep]: The key thing to note here is that the sampling distribution along each dimension in the loop is *conditioned on the sample values obtained on the earlier dimensions in the loop*.
