@@ -68,6 +68,14 @@ if __name__ == "__main__":
     # right panel: remove y labels and make ticks inout
     axr.tick_params(labelleft=False, direction='inout')
     
+    # axis label
+    axl.set_ylabel(r'$y$', usetex=True)
+    
+    # equations
+    axl.text(0.5, 0.6, r'$p(x, y)$', ha='right', va='top', transform=axl.transAxes, usetex=True)
+    axl.text(0.8, 0.2, r'$x=3.5$', ha='left', va='top', transform=axl.transAxes, usetex=True, rotation=270)
+    axr.text(0.8, 0.75, r'$p(y | x=3.5)$', ha='right', va='top', transform=axr.transAxes, usetex=True)
+    
     # save
     fig.savefig("../source/assets/2D_conditional.png", bbox_inches='tight')
     

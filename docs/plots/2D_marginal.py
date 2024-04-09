@@ -24,9 +24,9 @@ if __name__ == "__main__":
     ])
     
     # fig setup
-    asp = 6 / 7.5
+    asp = 6 / 8
     fig = plt.figure(figsize=(6, 6 / asp))
-    bottom = 0.04
+    bottom = 0.08
     left = 0.1
     right = 0.9
     dX = right - left
@@ -61,6 +61,13 @@ if __name__ == "__main__":
     
     # top panel: remove x labels and make ticks inout
     axt.tick_params(labelbottom=False, direction='inout')
+    
+    # axis label
+    axb.set_xlabel(r'$x$', usetex=True)
+    
+    # equations
+    axb.text(0.5, 0.6, r'$p(x, y)$', ha='right', va='top', transform=axb.transAxes, usetex=True)
+    axt.text(0.5, 0.6, r'$p(x)=\displaystyle\int dy\ p(x, y)$', ha='right', va='top', transform=axt.transAxes, usetex=True)
     
     # save
     fig.savefig("../source/assets/2D_marginal.png", bbox_inches='tight')
