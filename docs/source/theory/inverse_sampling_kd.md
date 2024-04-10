@@ -27,6 +27,7 @@ Looping back through these distributions, we can derive a cascade of conditional
 
 Then, to draw a sample $\mathbf{X}\sim p(\mathbf{x})$, we first draw a 1D sample along the first dimension $X_0 \sim p(x_0)$ using the univariate sampling procedure described in the previous section. Next, we draw a second 1D sample $X_1 \sim p(x_1 | x_0=X_0)$, then $X_2 \sim p(x_2 | x_0=X_0, x_1=X_1)$, and so on until the dimensions are exhausted.[^dimdep] 
 
+As in the univariate case, when the quantile functions for all of the conditional distributions are known, this procedure is an extremely rapid way of generating multivariate samples. However, when this is not the case and the quantile function is to be obtained numerically, the computational expense of the $k$-dimensional numerical integration grows rapidly with the number of dimensions.
 
 ## Example: Setup
 
@@ -74,27 +75,30 @@ As one might expect, unlike the marginal distribution $p(x)$, the conditional di
 
 ## Example: Sampling
 
-We now have everything we need to draw samples. The procedure runs as follows:
+We now have everything we need to draw samples. The whole procedure is illustrated on this (somewhat busy) figure:
 
+```{figure} ../assets/2D_sampling.png
+:align: center
+```
+
+There are five steps annotated on the figure. These are:
 1. Draw a uniform sample $U_1$.
-2. Use the 1D inverse transform sampling procedure to convert $U_1$ into a sample $X~p(x)$. Because the marginal PDF $p(x)$ is a Gaussian, this can be done analytically,[^probit] as we saw in the example accompanying the description of 1D inverse transform sampling.
+2. Given the marginal distribution $p(x)$, apply the quantile function $F^{-1}(U_1)$, to give a sample $X\sim p(x)$.[^step2]
 3. Given the sample $X$, calculate the parameters of the conditional PDF $p(y | x=X)$.
 4. Draw a second uniform sample $U_2$.
-5. Again using the 1D procedure, convert $U_2$ into a sample $Y~p(y|x=X)$.
+5. Again using the 1D procedure, convert $U_2$ into a sample $Y\sim p(y|x=X)$.
 
-Then, $X$ and $Y$ together form a joint sample from $p(x, y)$.
+Then, $X$ and $Y$ together form a joint sample from $p(x, y)$. In the figure above, the sample we get by carrying out the procedure once is indicated by the golden circle. 
 
-This procedure is animated below.
+To get multiple samples, we can simply repeat these steps multiple times. This is shown in the animation below.
 
 ```{figure} ../assets/2D_animation.gif
 :align: center
 ```
-
-As in the univariate case, when the quantile functions for all of the conditional distributions are known, this procedure is an extremely rapid way of generating multivariate samples. However, when this is not the case and the quantile function is to be obtained numerically, the computational expense of the $k$-dimensional numerical integration grows rapidly with the number of dimensions.
 
 [^dimdep]: The key thing to note here is that the sampling distribution along each dimension in the loop is *conditioned on the sample values obtained on the earlier dimensions in the loop*.
 [^axswap]: We could equally do this the other way round, i.e., derive $p(y)$ and $p(x | y)$.
 [^marginalparams]: In this case, $\mu_x=1.5$ and $\Sigma_{xx}=1.0$.
 [^projections]: These facts regarding marginal and conditional distributions can be understood as saying that both *projections* and *slices* of a multivariate Gaussian give Gaussian images.
 [^matrixeqs]: These equations hold in general for an $m$-dimensional conditional slice of an $n$-dimensional Gaussian distribution. In such a case, $\mu_x, \mu_y$ are vectors (subvectors of the parent Gaussian's mean vector) and the various $\Sigma_{(...)}$ objects are matrices (submatrices of the parent Gaussian's covariance matrix). Here, however, these are all simply scalars.
-[^probit]: $X = \mathrm{probit}(U_1)$
+[^step2]: This is precisely the 1D inverse transform sampling procedure described in the previous section. As we saw in the example there, because the marginal PDF $p(x)$ in this case is a Gaussian, the quantile function is the probit function.

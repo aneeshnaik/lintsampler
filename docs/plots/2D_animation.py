@@ -2,6 +2,7 @@ import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from matplotlib.patches import Circle
 plt.style.use('figstyle.mplstyle')
 
 
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     ])
 
     # generate samples    
-    N_SAMPLES = 1000
+    N_SAMPLES = 100
     ux, uy, xs, ys = generate_samples(mean, cov, N_SAMPLES)
     
     # conditional PDF params
@@ -48,10 +49,11 @@ if __name__ == "__main__":
     
     # figure
     fig = plt.figure(figsize=(10, 10))
-    left = 0.1
-    bottom = 0.1
-    dX = 0.4
-    dY = 0.4
+    left = 0.05
+    bottom = 0.05
+    right = 0.99
+    dX = (right - left) / 2
+    dY = dX
     ax0 = fig.add_axes([left, bottom, dX, dY])
     axxp = fig.add_axes([left, bottom + dY, dX, 0.5 * dY])
     axxc = fig.add_axes([left, bottom + 1.5 * dY, dX, 0.5 * dY])
@@ -78,13 +80,15 @@ if __name__ == "__main__":
     line1, = axxc.plot([], [], lw=1, c='grey')
     line2, = axxc.plot([], [], lw=1, c='grey')
     line3, = axxp.plot([], [], lw=1, c='grey')
-    line4, = ax0.plot([], [], lw=1, c='goldenrod')
+    line4, = ax0.plot([], [], lw=1, c='grey')
     ypdfline, = axyp.plot([], [], c='teal', lw=2)
     ycdfline, = axyc.plot([], [], c='teal', lw=2)
     line5, = axyc.plot([], [], lw=1, c='grey')
     line6, = axyc.plot([], [], lw=1, c='grey')
     line7, = axyp.plot([], [], lw=1, c='grey')
-    line8, = ax0.plot([], [], lw=1, c='goldenrod')
+    line8, = ax0.plot([], [], lw=1, c='grey')
+    circ = Circle((0, 0), 0.25, fc='none', zorder=10)
+    ax0.add_patch(circ)
     
     # axis limits
     for ax in [ax0, axxp, axxc]:
@@ -94,6 +98,10 @@ if __name__ == "__main__":
     axyp.set_xlim(-0.05, 0.7)
     axyc.set_xlim(-0.05, 1.05)
     
+    # axis labels
+    ax0.set_xlabel(r'$x$', usetex=True)
+    ax0.set_ylabel(r'$y$', usetex=True)
+
     # remove extraneous spines and ticks/labels
     for ax in [ax0, axxp, axxc]:
         ax.spines['top'].set_visible(False)
@@ -108,6 +116,7 @@ if __name__ == "__main__":
     axxp.tick_params(left=False, labelleft=False, labelbottom=False, direction='inout')
     axyp.tick_params(bottom=False, labelbottom=False, labelleft=False, direction='inout')
     axxc.set_yticks([0, 0.5, 1])
+    axyc.set_xticks([0, 0.5, 1])
     axxc.spines['left'].set_bounds(0, 1)
     axyc.spines['bottom'].set_bounds(0, 1)
     axxc.tick_params(axis='x', labelbottom=False, direction='inout')
@@ -116,6 +125,7 @@ if __name__ == "__main__":
     def animate(i):
         si = i//5
         if i % 5 == 0:
+            circ.set_facecolor('none')
             line1.set_data([-6.5, xs[si]], [ux[si], ux[si]])
             line2.set_data([], [])
             line3.set_data([], [])
@@ -148,10 +158,12 @@ if __name__ == "__main__":
             line6.set_data([-0.05, uy[si]], [ys[si], ys[si]])
             line7.set_data(axyp.get_xlim(), [ys[si], ys[si]])
             line8.set_data([-6.5, 6.5], [ys[si], ys[si]])
+            circ.set_center((xs[si], ys[si]))
+            circ.set_facecolor('goldenrod')
         pcoll.set_offsets(np.stack((xs[:si], ys[:si]), axis=-1))
-        return line1, line2, line3, line4, line5, line6, line7, line8, ypdfline, ycdfline, pcoll
+        return line1, line2, line3, line4, line5, line6, line7, line8, circ, ypdfline, ycdfline, pcoll
 
-    fps = 1.2
+    fps = 3
     ani = FuncAnimation(
         fig, animate, frames=5*N_SAMPLES, blit=True, interval=1000/fps
     )
