@@ -26,8 +26,9 @@ license
 :hidden: true
 :maxdepth: 1
 
-theory/inverse_sampling_1d
-theory/inverse_sampling_kd
+theory/preamble.md
+theory/inverse_sampling
+theory/linear_interpolant.md
 ```
 
 ```{toctree}
