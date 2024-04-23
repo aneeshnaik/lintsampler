@@ -29,6 +29,7 @@ license
 theory/preamble.md
 theory/inverse_sampling
 theory/linear_interpolant.md
+theory/worked_example.md
 ```
 
 ```{toctree}
