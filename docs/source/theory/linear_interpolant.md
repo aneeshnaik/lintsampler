@@ -1,13 +1,12 @@
 # Linear Interpolant Sampling
 
-This page describes the linear interpolant sampling algorithm underpinning `lintsampler`. The [first section](#sec-1dunit) outlines how to draw a sample on the 1D unit interval, i.e., when the density $f(x)$ is known at $x=0$ and $x=1$ only. The [second section](#sec-kdunit) then generalises this to the unit hypercube over an arbitrary number of dimensions. Next, the [third section](#sec-arbitrary) describes the procedure for drawing a sample in an arbitrary hyperbox, by applying a linear transformation to the unit hypercube sample. The [fourth section](#sec-multiple) discusses applying the technique in a context where there many such hyperboxes, e.g., when densities are known only on a grid.
+This page describes the linear interpolant sampling algorithm underpinning `lintsampler`. The [first section](#one-dimensional-unit-interval) outlines how to draw a sample on the 1D unit interval, i.e., when the density $f(x)$ is known at $x=0$ and $x=1$ only. The [second section](#k-dimensional-unit-hypercube) then generalises this to the unit hypercube over an arbitrary number of dimensions. Next, the [third section](#arbitrary-hyperbox) describes the procedure for drawing a sample in an arbitrary hyperbox, by applying a linear transformation to the unit hypercube sample. The [fourth section](#multiple-hyperboxes) discusses applying the technique in a context where there many such hyperboxes, e.g., when densities are known only on a grid.
 
-At the end of the page is a [summary section](#sec-summary) which summarises the whole procedure. All of the key equations and steps are restated there, so that it can serve as a self-contained description of the technique. Thus, readers seeking a quick reference can skip the preceding sections and head straight there.
+At the end of the page is a [summary section](#summary) which summarises the whole procedure. All of the key equations and steps are restated there, so that it can serve as a self-contained description of the technique. Thus, readers seeking a quick reference can skip the preceding sections and head straight there.
 
 The algebra on this page gets a little dense, and mostly concerns abstract probability distributions. The [next page](./worked_example) gives a worked example, which should make it all a little more concrete.
 
 
-(sec-1dunit)=
 ## One-dimensional unit interval
 
 First, the problem of drawing a sample on the one-dimensional unit interval, where the (unnormalised) density is known only at the interval ends. In other words, the density function of interest is $f(x)$, with $x\in [0, 1]$ and densities known at the vertices: $f(0) = f_0$ and $f(1)=f_1$. 
@@ -64,8 +63,8 @@ The animation below demonstrates this in action, taking the same toy problem as 
 :align: center
 ```
 
-(sec-kdunit)=
-## $k$-dimensional unit hypercube
+
+## k-dimensional unit hypercube
 
 Let's generalise the procedure from the previous section from the one-dimensional unit interval to the $k$-dimensional unit hypercube. The 'first' corner of the cube is at the coordinate origin, and the various sidelengths are unity. As in the 1D case, the density is known at the $2^k$ corners of the cube. We write $f_{i_0, i_1, ..., i_{k-1}}$ to indicate the density at the corner indexed $(i_0, i_1, ..., i_{k-1})$, $i_j \in \{0, 1\}$, so that e.g., $f_{0...0}$ is the density at the origin.
 
@@ -179,7 +178,7 @@ So, $g^{(j)}_0$ and $g^{(j)}_1$ are aggregate densities which depend on the samp
 In summary, the procedure for drawing a sample from the $k$-linear interpolant density is to loop over the dimensions; at each dimension, evaluate $g_0$ and $g_1$ using the sample values from the dimensions before the current dimension, then sample a new point along the current dimension using Eq. {eq}`1DSample`, replacing $f_0,f_1$ with $g^{(j)}_0, g^{(j)}_1$.
 
 
-(sec-arbitrary)=
+
 ## Arbitrary hyperbox
 
 The sampling procedure outlined in the previous section concerned a unit hypercube with first vertex at the origin. However, it is easily generalised to arbitrary hyperboxes at arbitrary positions. Given a $k$-dimensional box with first vertex at $\mathbf{a}=(a_0, a_1, ..., a_{k-1})$ and final vertex at $\mathbf{b}=(b_0, b_1, ..., b_{k-1})$ (so that the box spans $[a_j, b_j]$ along dimension $j$), the k-linear interpolant within the box is given by
@@ -231,7 +230,7 @@ This is demonstrated in two dimensions in the figure below.
 ```
 In the left-hand panel we start off with a 2D rectilinear cell in ($x_0, x_1$): a rectangle bounded by $x_0=40,50$ and $x_1=180,200$. Within this rectangle is a (bilinearly) interpolated density function. The centre panel then shows this density transformed to the unit square. Within the unit square, we take a sample (shown by the blue point), then we can transform it back to the space of the original rectangle (right-hand panel).
 
-(sec-multiple)=
+
 ## Multiple hyperboxes
 
 We now have a procedure for drawing a random sample within a single $k$-dimensional hyperbox. It is straightforward to incorporate this procedure into an algorithm for drawing a single sample across a series of such hyperboxes. An example of such a scenario is a grid where densities are known only at the intersections of the gridlines.
@@ -252,7 +251,7 @@ $$ (CellProbability)
 
 Having thus assigned a probability to each cell, one can then randomly choose a cell from the probability-weighted list of cells, then draw a sample within the chosen cell using the procedure described in the previous subsections.
 
-(sec-summary)=
+
 ## Summary
 
 This section summarises the algorithm which has been described over the course of this page. The key steps and equations are all repeated here so that this section can be used as a self-contained reference. 
