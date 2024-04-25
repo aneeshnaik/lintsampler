@@ -79,8 +79,6 @@ $$
     p(z_0, z_1) = 4\frac{f_{00}(1-z_0)(1-z_1) + f_{01}(1-z_0)z_1 + f_{10}z_0(1-z_1) + f_{11}z_0 z_1}{f_{00} + f_{01} + f_{10} + f_{11}}
 $$
 
-**FIGURE**
-
 Now, let's go through the procedure described on the previous page ([summary](./linear_interpolant.md#summary)):
 
 - We start with the first dimension ($z_0$)[^interchangeable] and calculate the aggregate densities $g_0$ and $g_1$. As this is the first dimension, these are simply equal to
