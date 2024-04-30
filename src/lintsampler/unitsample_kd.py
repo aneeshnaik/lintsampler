@@ -41,6 +41,9 @@ def _unitsample_kd_single(*f, seed=None):
 
     # set up empty array for sample
     sample = np.zeros(k)
+    
+    # generate uniform samples      
+    u = rng.random(size=k)
 
     # loop over dims, starting with first
     # at each dim sample from p(current dim | previous dims)
@@ -59,7 +62,7 @@ def _unitsample_kd_single(*f, seed=None):
         f0, f1 = np.sum(freduced, axis=tuple(range(d)))
 
         # get samples
-        sample[d] = _unitsample_1d(f0, f1, seed=rng)
+        sample[d] = _unitsample_1d(f0, f1, u=u[d])
 
     return sample
 
@@ -107,6 +110,9 @@ def _unitsample_kd(*f, seed=None):
     
     # set up empty array for samples
     samples = np.zeros((N, k))
+    
+    # generate uniform samples
+    u = rng.random(size=(N, k))
 
     # loop over dims, starting with first
     # at each dim sample from p(current dim | previous dims)
@@ -125,6 +131,6 @@ def _unitsample_kd(*f, seed=None):
         f0, f1 = np.sum(freduced, axis=tuple(range(d)))
 
         # get samples
-        samples[:, d] = _unitsample_1d(f0, f1, seed=rng)
+        samples[:, d] = _unitsample_1d(f0, f1, u=u[:, d])
 
     return samples
