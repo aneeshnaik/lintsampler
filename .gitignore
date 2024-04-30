@@ -6,4 +6,8 @@ docs/build/
 dist/
 TODO
 
+build/
+
+examples/
+
 lintsampler.egg-info/

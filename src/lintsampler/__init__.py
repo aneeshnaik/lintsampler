@@ -1,4 +1,4 @@
-from .gridsample import gridsample
-from .sample import sample
 
-__all__ = ["gridsample", "sample"]
+from .lintsampler import LintSampler
+
+__all__ = ["LintSampler"]

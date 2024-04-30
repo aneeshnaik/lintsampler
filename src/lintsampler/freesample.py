@@ -4,7 +4,7 @@ from .unitsample_kd import _unitsample_kd
 from .utils import _check_N_samples
 
 
-def sample(x0, x1, *f, N_samples=None, seed=None):
+def freesample(x0, x1, *f, N_samples=None, seed=None):
     """Draw sample(s) from k-D hyperbox(es) with known vertex densities.
 
     Given a k-dimensional hyperbox (or a set of such boxes) with densities known
