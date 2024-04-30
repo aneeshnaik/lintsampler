@@ -1,3 +1,5 @@
+from scipy.stats.qmc import QMCEngine, Sobol
+
 
 def _check_N_samples(N_samples):
     """Check requested no. samples is None or positive int, else raise error."""
@@ -7,6 +9,21 @@ def _check_N_samples(N_samples):
         elif N_samples <= 0:
             raise ValueError(f"Expected positive N_samples, got {N_samples}")
     return
+
+
+def _prepare_qmc_engine(qmc_engine, k, seed):
+    # TODO docstring
+    if qmc_engine is None:
+        qmc_engine = Sobol(d=k, scramble=True, bits=30, seed=seed)
+    elif isinstance(qmc_engine, QMCEngine):
+        if qmc_engine.d != k:
+            raise ValueError("Inconsistent engine dimension")
+        if seed is not None:
+            raise ValueError("seed must be None if providing qmc_engine")
+    else:
+        raise ValueError("qmc_engine must be QMCEngine instance or None")
+    return qmc_engine
+
 
 def _multiply_array_slice(arr, factor, axis, idx):
     """Multiply (inplace) subslice of array by given factor along given slice.

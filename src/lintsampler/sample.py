@@ -1,10 +1,11 @@
 import numpy as np
 from math import log2
 from .unitsample_kd import _unitsample_kd
-from .utils import _check_N_samples
+from .utils import _check_N_samples, _prepare_qmc_engine
 
 
-def sample(x0, x1, *f, N_samples=None, seed=None):
+def sample(x0, x1, *f, N_samples=None, seed=None, qmc=False, qmc_engine=None):
+    # TODO add qmc to docstring
     """Draw sample(s) from k-D hyperbox(es) with known vertex densities.
 
     Given a k-dimensional hyperbox (or a set of such boxes) with densities known
@@ -167,12 +168,19 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     # check appropriate number of densities given
     if len(f) != 2**k:
         raise ValueError("Expected 2^k corner densities.")
-
-    # prepare RNG
-    rng = np.random.default_rng(seed)
     
-    # choose cell(s) 
-    c = _cell_choice(x0, x1, *f, N_cells=N_samples, seed=rng)
+    # if quasi Monte Carlo, set up QMC engine
+    if qmc:
+        qmc_engine = _prepare_qmc_engine(qmc_engine, k, seed)
+
+    # choose cell(s)
+    c = _cell_choice(
+        x0, x1, *f, N_cells=N_samples, seed=seed, qmc_engine=qmc_engine
+    )
+    
+    # reset QMC engine if using
+    if qmc:
+        qmc_engine.reset()
 
     # subset coords and densities of chosen cell(s)
     x0 = x0[c]
@@ -180,7 +188,7 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     f = tuple([fi[c] for fi in f])
     
     # draw samples
-    z = x0 + (x1 - x0) * _unitsample_kd(*f, seed=rng)
+    z = x0 + (x1 - x0) * _unitsample_kd(*f, seed=seed, qmc_engine=qmc_engine)
 
     # squeeze down to scalar / 1D if appropriate
     if not N_samples and (k == 1):
@@ -191,7 +199,10 @@ def sample(x0, x1, *f, N_samples=None, seed=None):
     return z
     
 
-def _cell_choice(x0, x1, *f, N_cells=None, seed=None):
+def _cell_choice(x0, x1, *f, N_cells=None, seed=None, qmc_engine=None):
+    # TODO implement qmc engine
+    # TODO add qmc engine to docstring
+    # TODO manual choice
     """Randomly choose from mass-weighted series of k-dimensional hyperboxes.
 
     Given N k-dimensional hyperboxes with densities known only at 2^k corners

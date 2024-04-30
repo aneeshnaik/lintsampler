@@ -1,10 +1,13 @@
 import numpy as np
 from functools import reduce
 from .unitsample_kd import _unitsample_kd
-from .utils import _check_N_samples
+from .utils import _check_N_samples, _prepare_qmc_engine
 
 
-def gridsample(*edgearrays, f, N_samples=None, seed=None):
+def gridsample(
+    *edgearrays, f, N_samples=None, seed=None, qmc=False, qmc_engine=None
+):
+    # TODO add QMC to docstring
     """Draw sample(s) from density function defined on k-D grid.
     
     Given a k-dimensional grid shaped :math:`(N_0, N_1, ..., N_{k-1})`, the user
@@ -119,18 +122,24 @@ def gridsample(*edgearrays, f, N_samples=None, seed=None):
     if f.shape != tuple(len(a) for a in edgearrays):
         raise ValueError("Shape of densities doesn't match edge array lengths.")
     
-    
-    # prepare RNG
-    rng = np.random.default_rng(seed)
+    # if quasi Monte Carlo, set up QMC engine
+    if qmc:
+        qmc_engine = _prepare_qmc_engine(qmc_engine, f.ndim, seed)
     
     # randomly choose grid cell(s)
-    cells = _gridcell_choice(*edgearrays, f=f, N_cells=N_samples, seed=rng)
+    cells = _gridcell_choice(
+        *edgearrays, f=f, N_cells=N_samples, seed=seed, qmc_engine=qmc_engine
+    )
+    
+    # reset QMC engine if using
+    if qmc:
+        qmc_engine.reset()
     
     # get 2^k-tuple of densities at cell corners
     corners = _gridcell_corners(f, cells)
 
     # sample on unit hypercube
-    z = _unitsample_kd(*corners, seed=rng)
+    z = _unitsample_kd(*corners, seed=seed, qmc_engine=qmc_engine)
 
     # rescale coordinates (loop over dimensions)
     for d in range(f.ndim):
@@ -214,7 +223,10 @@ def _gridcell_volumes(*edgearrays):
     return vols
 
 
-def _gridcell_choice(*edgearrays, f, N_cells=None, seed=None):
+def _gridcell_choice(*edgearrays, f, N_cells=None, seed=None, qmc_engine=None):
+    # TODO implement qmc engine
+    # TODO add qmc engine to docstring
+    # TODO manual choice
     """From k-dimensional grid of densities, choose mass-weighted cell(s).
 
     Given a k-dimensional grid, shaped (N0 x N1 x ... x N{k-1}), the user
