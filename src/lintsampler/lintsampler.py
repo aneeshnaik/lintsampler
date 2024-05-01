@@ -5,16 +5,19 @@ from .freesample import freesample
 
 class LintSampler:
 
-    def __init__(self, grid=(),rngseed=42):
+    def __init__(self, pdf, grid=(), rngseed=42):
         """
         
         grid needs to be a tuple of the edges
 
         1. grid is a tuple
         2. grid is a list of arrays
-        3. grid is a list of grid points
+        3. grid is a list of grid points: this must be 4 d x n arrays, where d is the dimensionality and n is the number of grid points
         
         """
+
+        # set the pdf to be widely accessible
+        self.pdf = pdf
 
         # set the random seed
         self.rng = np.random.default_rng(rngseed)
@@ -25,25 +28,26 @@ class LintSampler:
 
         if self.dim==0:
             raise ValueError("LintSampler.__init__: you must specify an evaluation domain with a tuple of boundaries, arrays, or grid points. See documentation for details.")
+            # or, we could here drop into an adaptive grid selection
+            # or, we could sample on a unit hypercube with dimensions of the pdf
 
-        # check first element grid for which sampling method we will use
+        # check element grid for which sampling method we will use
         
-        # 0. are we in the 1d case?
+        # 0. are we in the 1d case? the input is just a single tuple or array.
         if (isinstance(grid[0],float) | (isinstance(grid[0],int))):
 
-            raise NotImplementedError("LintSampler: dimension one arrays not supported (yet).")
-            # override the dimensionality
-            #self.dim = 1
+            # override the inferred dimensionality
+            self.dim = 1
 
             # set the arrays
-            #if len(grid)==3:
-            #    self.edgearrays = np.linspace(grid[0],grid[1],grid[2])
-            #    self.edgedims = grid[2]
-            #else:
-            #    self.edgearrays = grid
-            #    self.edgedims = len(grid)
+            if len(grid)==3:
+                self.edgearrays = np.linspace(grid[0],grid[1],grid[2])
+                self.edgedims = grid[2]
+            else:
+                self.edgearrays = grid
+                self.edgedims = len(grid)
 
-            #self.eval_type='gridsample'
+            self.eval_type='gridsample'
 
         # 1. tuples defining the array -> make arrays, pass to gridsample
         if isinstance(grid[0],tuple):
@@ -84,7 +88,7 @@ class LintSampler:
             else:
                 self.eval_type = 'freesample'
 
-    def sample(self, pdf, N_samples=None, funcargs=()):
+    def sample(self, N_samples=None, funcargs=()):
         """
         
         # pdf needs to be treated carefully to evaluate on a specific array: how do we help the user with this?
@@ -95,14 +99,21 @@ class LintSampler:
 
         if self.eval_type == 'gridsample':
 
-            # create the flattened grid for evaluation
-            edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(np.prod(self.edgedims), self.dim)
+            if self.dim > 1:
+                # create the flattened grid for evaluation
+                edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(np.prod(self.edgedims), self.dim)
 
-            # reshape the grid: assumes function takes same number of arguments as dimensions
-            evalf = pdf(edgegrid,*funcargs).reshape(*self.edgedims)
+                # reshape the grid: assumes function takes same number of arguments as dimensions
+                evalf = self.pdf(edgegrid,*funcargs).reshape(*self.edgedims)
 
-            # call the gridded sampler
-            X = gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
+                # call the gridded sampler
+                X = gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
+
+            else: 
+                # the 1d case: no flattening needed
+                evalf = self.pdf(self.edgearrays,*funcargs)
+
+                X = gridsample(self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
 
             return X
 

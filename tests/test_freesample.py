@@ -4,7 +4,7 @@ import sys
 import os
 from scipy.stats import norm, multivariate_normal
 sys.path.insert(0, os.path.abspath("src"))
-from lintsampler import sample
+from lintsampler import freesample
 
 
 @pytest.fixture
