@@ -5,7 +5,6 @@ from .unitsample_1d import _unitsample_1d
 
 
 def _unitsample_kd_single(*f, u):
-    # TODO update docstring
     """Single sample from k-linear interpolant in k-dimensional unit hypercube.
     
     f is a series of 2^k scalars, representing the (not necessarily normalised)
@@ -19,11 +18,8 @@ def _unitsample_kd_single(*f, u):
     ----------
     *f : 2^k scalars
         Densities at corners of k-d unit cube
-    seed : None/int/numpy random Generator, optional
-        Seed for numpy random generator. Can be random generator itself, in
-        which case it is left unchanged. Default is None, in which case new
-        default generator is created. See numpy random generator docs for more
-        information.
+    u : numpy array, length k
+        Single k-dimensional uniform sample.
 
     Returns
     -------
@@ -63,7 +59,6 @@ def _unitsample_kd_single(*f, u):
 
 
 def _unitsample_kd(*f, u):
-    # TODO update docstring
     """Batched sampling from linear interpolant in k-dimensional unit hypercube.
     
     f is either a series of 2^k scalars or 2^k 1D numpy arrays, each length N,
@@ -78,11 +73,8 @@ def _unitsample_kd(*f, u):
     ----------
     *f : 2^k scalars or 2^k 1D numpy arrays, length N
         Densities at corners of k-d unit cube (or batch of N such cubes).
-    seed : None/int/numpy random Generator, optional
-        Seed for numpy random generator. Can be random generator itself, in
-        which case it is left unchanged. Default is None, in which case new
-        default generator is created. See numpy random generator docs for more
-        information.
+    u : 1D numpy array, shape (k,) or 2D numpy array, shape (N, k)
+        Single (or N) k-dimensional uniform sample(s).
 
     Returns
     -------

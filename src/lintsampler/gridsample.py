@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 from functools import reduce
 from .unitsample_kd import _unitsample_kd
 from .utils import _check_N_samples, _generate_usamples, _choice
@@ -7,7 +8,6 @@ from .utils import _check_N_samples, _generate_usamples, _choice
 def gridsample(
     *edgearrays, f, N_samples=None, seed=None, qmc=False, qmc_engine=None
 ):
-    # TODO add QMC to docstring
     """Draw sample(s) from density function defined on k-D grid.
     
     Given a k-dimensional grid shaped :math:`(N_0, N_1, ..., N_{k-1})`, the user
@@ -38,6 +38,15 @@ def gridsample(
         which case it is left unchanged. Default is None, in which case new
         default generator is created. See ``numpy`` random generator docs for
         more information.
+    qmc : bool, optional
+        Whether to use Quasi-Monte Carlo sampling. Default is False.
+    qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
+        QMC engine to use if qmc flag above is True. Should be subclass of
+        scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
+        first k dimensions are used for lintsampling, while last dimension is
+        used for cell choice (this happens even if only one cell is given).
+        Default is None. In that case, if qmc is True, then a scrambled Sobol
+        sequence is used.
 
     Returns
     -------
@@ -101,6 +110,14 @@ def gridsample(
     """
     # check requested no. samples is None or positive int
     _check_N_samples(N_samples)
+
+    # warn if qmc engine provided but qmc off
+    if not qmc and qmc_engine is not None:
+        warnings.warn("Provided qmc_engine won't be used as qmc switched off.")
+    
+    # warn if qmc engine provided and RNG seed provided
+    if qmc_engine is not None and seed is not None:
+        warnings.warn("Provided random seed won't be used as qmc_engine provided.")
 
     # check edge arrs 1D, mono. increasing, and match corresponding f dim
     for i, a in enumerate(edgearrays):
@@ -223,7 +240,6 @@ def _gridcell_volumes(*edgearrays):
 
 
 def _gridcell_choice(*edgearrays, f, u):
-    # TODO redo docstring
     """From k-dimensional grid of densities, choose mass-weighted cell(s).
 
     Given a k-dimensional grid, shaped (N0 x N1 x ... x N{k-1}), the user
@@ -244,22 +260,13 @@ def _gridcell_choice(*edgearrays, f, u):
         spaced.
     f : k-dim numpy array, shape (N0+1 x N1+1 x ... x N{k-1}+1)
         Grid of densities evaluated at corners of k-dimensional grid.
-    N_cells : int, optional
-        Number of cells to sample. Default is None, in which case a single cell
-        is returned (1D array of cell indices). Note that if N_cells is instead
-        explicitly set to 1, then the cell is batched, so a 2-d (1xk) array of
-        cell indices is returned.
-    seed : None/int/numpy random Generator, optional
-        Seed for numpy random generator. Can be random generator itself, in
-        which case it is left unchanged. Default is None, in which case new
-        default generator is created. See numpy random generator docs for more
-        information.
+    u : 1D numpy array, length N_cells
+        Array of uniform samples, length equal to number of desired cells.
 
     Returns
     -------
-    idx : 2D (N_cells x k) or 1D (k,) numpy array of ints
-        Indices along each dimension of randomly sampled cells. 2D if N_cells is
-        set with an integer (including 1), 1D if N_cells is set to None.
+    idx : 2D numpy array (N_cells x k)
+        Indices along each dimension of randomly sampled cells.
     """
     # calculate cell volumes
     V = _gridcell_volumes(*edgearrays)

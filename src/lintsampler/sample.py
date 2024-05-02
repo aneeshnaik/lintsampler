@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 from math import log2
 from .unitsample_kd import _unitsample_kd
 from .utils import _check_N_samples, _generate_usamples, _choice
@@ -8,7 +9,6 @@ def sample(
     x0, x1, *f, N_samples=None, seed=None,
     qmc=False, qmc_engine=None
 ):
-    # TODO add qmc to docstring
     """Draw sample(s) from k-D hyperbox(es) with known vertex densities.
 
     Given a k-dimensional hyperbox (or a set of such boxes) with densities known
@@ -35,6 +35,15 @@ def sample(
         which case it is left unchanged. Default is None, in which case new
         default generator is created. See ``numpy`` random generator docs for
         more information.
+    qmc : bool, optional
+        Whether to use Quasi-Monte Carlo sampling. Default is False.
+    qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
+        QMC engine to use if qmc flag above is True. Should be subclass of
+        scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
+        first k dimensions are used for lintsampling, while last dimension is
+        used for cell choice (this happens even if only one cell is given).
+        Default is None. In that case, if qmc is True, then a scrambled Sobol
+        sequence is used.
 
     Returns
     -------
@@ -142,6 +151,14 @@ def sample(
     # check requested no. samples is None or positive int
     _check_N_samples(N_samples)
     
+    # warn if qmc engine provided but qmc off
+    if not qmc and qmc_engine is not None:
+        warnings.warn("Provided qmc_engine won't be used as qmc switched off.")
+    
+    # warn if qmc engine provided and RNG seed provided
+    if qmc_engine is not None and seed is not None:
+        warnings.warn("Provided random seed won't be used as qmc_engine provided.")
+    
     # check densities positive everywhere
     for fi in f:
         if np.any(fi < 0):
@@ -165,8 +182,8 @@ def sample(
     if np.any(x1 <= x0):
         raise ValueError("Need x1 > x0 everywhere")
 
-    # infer dimensionality and batch size
-    Nb, k = x0.shape
+    # infer dimensionality
+    k = x0.shape[1]
     
     # check appropriate number of densities given
     if len(f) != 2**k:
@@ -186,7 +203,7 @@ def sample(
     x0 = x0[c]
     x1 = x1[c]
     f = tuple([fi[c] for fi in f])
-    
+
     # draw samples
     z = x0 + (x1 - x0) * _unitsample_kd(*f, u=u[:, :-1])
 
@@ -202,7 +219,6 @@ def sample(
     
 
 def _cell_choice(x0, x1, *f, u):
-    # TODO update docstring
     """Randomly choose from mass-weighted series of k-dimensional hyperboxes.
 
     Given N k-dimensional hyperboxes with densities known only at 2^k corners
@@ -219,15 +235,8 @@ def _cell_choice(x0, x1, *f, u):
         otherwise 2D.
     *f : 2^k 1D numpy arrays, length N
         Densities at corners of batch of N k-D hypercubes.
-    N_cells : int, optional
-        Number of cells to sample. Default is None, in which case a single cell
-        index (integer) is returned. Otherwise, 1D array of cell indices is
-        returned.
-    seed : None/int/numpy random Generator, optional
-        Seed for numpy random generator. Can be random generator itself, in
-        which case it is left unchanged. Default is None, in which case new
-        default generator is created. See numpy random generator docs for more
-        information.
+    u : 1D numpy array, length N
+        N uniform samples.
 
     Returns
     -------
