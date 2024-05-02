@@ -6,6 +6,14 @@ from scipy.stats import norm, multivariate_normal
 sys.path.insert(0, os.path.abspath("src"))
 from lintsampler import gridsample
 
+# TODO repeat 1D Gaussian and kD Gaussian w/ default QMC
+# TODO check non-power of 2 raises Sobol warning
+# TODO check error raised if QMC engine dimension wrong
+# TODO test error raised if provided QMC engine wrong
+# TODO repeat 1D Gaussian and kD Gaussian w/ Halton engine 
+# TODO test determinism with QMC
+# TODO test this works with qmc and None N
+
 @pytest.fixture
 def x_edges():
     return np.linspace(0, 10, 33)

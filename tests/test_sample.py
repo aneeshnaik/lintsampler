@@ -6,6 +6,13 @@ from scipy.stats import norm, multivariate_normal
 sys.path.insert(0, os.path.abspath("src"))
 from lintsampler import sample
 
+# TODO repeat 1D uniform, 1D gmm and 2D gmm tests w/ default qmc
+# TODO check non-power of 2 raises Sobol warning
+# TODO check error raised if QMC engine dimension wrong
+# TODO test error raised if provided QMC engine wrong
+# TODO repeat 1D uniform, 1D gmm and 2D gmm tests w/ Halton engine 
+# TODO test determinism with QMC
+# TODO test this works with qmc and None N
 
 @pytest.fixture
 def x0_single_3d():

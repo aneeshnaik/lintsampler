@@ -1,7 +1,7 @@
 import numpy as np
 from functools import reduce
 from .unitsample_kd import _unitsample_kd
-from .utils import _check_N_samples, _prepare_qmc_engine
+from .utils import _check_N_samples, _generate_usamples, _choice
 
 
 def gridsample(
@@ -121,25 +121,24 @@ def gridsample(
     # check shapes of edge arrays / f make sense
     if f.shape != tuple(len(a) for a in edgearrays):
         raise ValueError("Shape of densities doesn't match edge array lengths.")
-    
-    # if quasi Monte Carlo, set up QMC engine
-    if qmc:
-        qmc_engine = _prepare_qmc_engine(qmc_engine, f.ndim, seed)
-    
+
+    # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
+    # first k dims used for lintsampling, last dim used for cell choice
+    if N_samples:
+        u = _generate_usamples(N_samples, f.ndim + 1, seed, qmc, qmc_engine)
+    else:
+        u = _generate_usamples(1, f.ndim + 1, seed, qmc, qmc_engine)
+
     # randomly choose grid cell(s)
-    cells = _gridcell_choice(
-        *edgearrays, f=f, N_cells=N_samples, seed=seed, qmc_engine=qmc_engine
-    )
-    
-    # reset QMC engine if using
-    if qmc:
-        qmc_engine.reset()
-    
+    cells = _gridcell_choice(*edgearrays, f=f, u=u[..., -1])
+    if not N_samples:
+        cells = cells[0]
+
     # get 2^k-tuple of densities at cell corners
     corners = _gridcell_corners(f, cells)
 
     # sample on unit hypercube
-    z = _unitsample_kd(*corners, seed=seed, qmc_engine=qmc_engine)
+    z = _unitsample_kd(*corners, u=u[..., :-1])
 
     # rescale coordinates (loop over dimensions)
     for d in range(f.ndim):
@@ -223,10 +222,8 @@ def _gridcell_volumes(*edgearrays):
     return vols
 
 
-def _gridcell_choice(*edgearrays, f, N_cells=None, seed=None, qmc_engine=None):
-    # TODO implement qmc engine
-    # TODO add qmc engine to docstring
-    # TODO manual choice
+def _gridcell_choice(*edgearrays, f, u):
+    # TODO redo docstring
     """From k-dimensional grid of densities, choose mass-weighted cell(s).
 
     Given a k-dimensional grid, shaped (N0 x N1 x ... x N{k-1}), the user
@@ -264,9 +261,6 @@ def _gridcell_choice(*edgearrays, f, N_cells=None, seed=None, qmc_engine=None):
         Indices along each dimension of randomly sampled cells. 2D if N_cells is
         set with an integer (including 1), 1D if N_cells is set to None.
     """
-    # prepare RNG
-    rng = np.random.default_rng(seed)
-    
     # calculate cell volumes
     V = _gridcell_volumes(*edgearrays)
     
@@ -281,8 +275,7 @@ def _gridcell_choice(*edgearrays, f, N_cells=None, seed=None, qmc_engine=None):
     p = m_norm.flatten()
 
     # choose cells
-    a = np.prod([s - 1 for s in f.shape])
-    cells = rng.choice(a, p=p, size=N_cells)
+    cells = _choice(p=p, u=u)
 
     # unravel 1D cell indices into k-D grid indices
     idx = np.stack(np.unravel_index(cells, m_norm.shape), axis=-1)

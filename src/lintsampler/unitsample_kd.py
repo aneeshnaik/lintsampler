@@ -4,7 +4,8 @@ from .utils import _multiply_array_slice
 from .unitsample_1d import _unitsample_1d
 
 
-def _unitsample_kd_single(*f, seed=None, qmc_engine=None):
+def _unitsample_kd_single(*f, u):
+    # TODO update docstring
     """Single sample from k-linear interpolant in k-dimensional unit hypercube.
     
     f is a series of 2^k scalars, representing the (not necessarily normalised)
@@ -29,10 +30,7 @@ def _unitsample_kd_single(*f, seed=None, qmc_engine=None):
     samples : 1D array shape (k)
         Sample from k-linear interpolant.
 
-    """        
-    # prepare RNG
-    rng = np.random.default_rng(seed)
-    
+    """            
     # infer dimensionality
     k = int(log2(len(f)))
     
@@ -41,12 +39,6 @@ def _unitsample_kd_single(*f, seed=None, qmc_engine=None):
 
     # set up empty array for sample
     sample = np.zeros(k)
-    
-    # generate uniform samples either from QMC engine or standard rng
-    if qmc_engine is None:
-        u = rng.random(size=k)
-    else:
-        u = qmc_engine.random().squeeze()
 
     # loop over dims, starting with first
     # at each dim sample from p(current dim | previous dims)
@@ -70,7 +62,8 @@ def _unitsample_kd_single(*f, seed=None, qmc_engine=None):
     return sample
 
 
-def _unitsample_kd(*f, seed=None, qmc_engine=None):
+def _unitsample_kd(*f, u):
+    # TODO update docstring
     """Batched sampling from linear interpolant in k-dimensional unit hypercube.
     
     f is either a series of 2^k scalars or 2^k 1D numpy arrays, each length N,
@@ -99,11 +92,8 @@ def _unitsample_kd(*f, seed=None, qmc_engine=None):
     """    
     # if densities scalar, pass to unbatched function
     if not hasattr(f[0], "__len__"):
-        return _unitsample_kd_single(*f, seed=seed, qmc_engine=qmc_engine)
-    
-    # prepare RNG
-    rng = np.random.default_rng(seed)
-    
+        return _unitsample_kd_single(*f, u=u[0])
+
     # infer dimensionality and batch size
     k = int(log2(len(f)))
     N = len(f[0])
@@ -113,12 +103,6 @@ def _unitsample_kd(*f, seed=None, qmc_engine=None):
     
     # set up empty array for samples
     samples = np.zeros((N, k))
-
-    # generate uniform samples either from QMC engine or standard rng
-    if qmc_engine is None:
-        u = rng.random(size=(N, k))
-    else:
-        u = qmc_engine.random(N)
 
     # loop over dims, starting with first
     # at each dim sample from p(current dim | previous dims)

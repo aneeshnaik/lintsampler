@@ -1,4 +1,27 @@
+import numpy as np
 from scipy.stats.qmc import QMCEngine, Sobol
+
+
+def _generate_usamples(N, ndim, seed, qmc, qmc_engine):
+    # TODO docstring
+    # prepare RNG
+    rng = np.random.default_rng(seed)
+    if qmc:
+        qmc_engine = _prepare_qmc_engine(qmc_engine, ndim, seed=rng)
+        u = qmc_engine.random(N)
+    else:
+        u = rng.random((N, ndim))
+    return u
+
+
+def _choice(p, u):
+    # TODO docstring
+    # TODO implement QMC
+    cdf = p.cumsum()
+    cdf /= cdf[-1]
+    idx = cdf.searchsorted(u, side='right')
+    #rng.shuffle(idx)
+    return idx
 
 
 def _check_N_samples(N_samples):
@@ -18,8 +41,6 @@ def _prepare_qmc_engine(qmc_engine, k, seed):
     elif isinstance(qmc_engine, QMCEngine):
         if qmc_engine.d != k:
             raise ValueError("Inconsistent engine dimension")
-        if seed is not None:
-            raise ValueError("seed must be None if providing qmc_engine")
     else:
         raise ValueError("qmc_engine must be QMCEngine instance or None")
     return qmc_engine

@@ -1,10 +1,13 @@
 import numpy as np
 from math import log2
 from .unitsample_kd import _unitsample_kd
-from .utils import _check_N_samples, _prepare_qmc_engine
+from .utils import _check_N_samples, _generate_usamples, _choice
 
 
-def sample(x0, x1, *f, N_samples=None, seed=None, qmc=False, qmc_engine=None):
+def sample(
+    x0, x1, *f, N_samples=None, seed=None,
+    qmc=False, qmc_engine=None
+):
     # TODO add qmc to docstring
     """Draw sample(s) from k-D hyperbox(es) with known vertex densities.
 
@@ -169,18 +172,15 @@ def sample(x0, x1, *f, N_samples=None, seed=None, qmc=False, qmc_engine=None):
     if len(f) != 2**k:
         raise ValueError("Expected 2^k corner densities.")
     
-    # if quasi Monte Carlo, set up QMC engine
-    if qmc:
-        qmc_engine = _prepare_qmc_engine(qmc_engine, k, seed)
+    # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
+    # first k dims used for lintsampling, last dim used for cell choice
+    if N_samples:
+        u = _generate_usamples(N_samples, k + 1, seed, qmc, qmc_engine)
+    else:
+        u = _generate_usamples(1, k + 1, seed, qmc, qmc_engine)
 
     # choose cell(s)
-    c = _cell_choice(
-        x0, x1, *f, N_cells=N_samples, seed=seed, qmc_engine=qmc_engine
-    )
-    
-    # reset QMC engine if using
-    if qmc:
-        qmc_engine.reset()
+    c = _cell_choice(x0, x1, *f, u=u[:, -1])
 
     # subset coords and densities of chosen cell(s)
     x0 = x0[c]
@@ -188,21 +188,21 @@ def sample(x0, x1, *f, N_samples=None, seed=None, qmc=False, qmc_engine=None):
     f = tuple([fi[c] for fi in f])
     
     # draw samples
-    z = x0 + (x1 - x0) * _unitsample_kd(*f, seed=seed, qmc_engine=qmc_engine)
+    z = x0 + (x1 - x0) * _unitsample_kd(*f, u=u[:, :-1])
 
     # squeeze down to scalar / 1D if appropriate
     if not N_samples and (k == 1):
         z = z.item()
+    elif not N_samples:
+        z = z[0]
     elif (k == 1):
         z = z[:, 0]
 
     return z
     
 
-def _cell_choice(x0, x1, *f, N_cells=None, seed=None, qmc_engine=None):
-    # TODO implement qmc engine
-    # TODO add qmc engine to docstring
-    # TODO manual choice
+def _cell_choice(x0, x1, *f, u):
+    # TODO update docstring
     """Randomly choose from mass-weighted series of k-dimensional hyperboxes.
 
     Given N k-dimensional hyperboxes with densities known only at 2^k corners
@@ -234,10 +234,7 @@ def _cell_choice(x0, x1, *f, N_cells=None, seed=None, qmc_engine=None):
     idx : 2D (N_cells x k) or 1D (k,) numpy array of ints
         Indices along each dimension of randomly sampled cells. 2D if N_cells is
         set with an integer (including 1), 1D if N_cells is set to None.
-    """
-    # prepare RNG
-    rng = np.random.default_rng(seed)
-    
+    """    
     # mass = average density * volume
     V = np.prod(x1 - x0, axis=-1)
     f_avg = np.average(np.stack(f), axis=0)
@@ -247,4 +244,4 @@ def _cell_choice(x0, x1, *f, N_cells=None, seed=None, qmc_engine=None):
     p = m / m.sum()
 
     # choose cells
-    return rng.choice(len(p), p=p, size=N_cells)
+    return _choice(p=p, u=u)
