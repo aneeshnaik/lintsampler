@@ -4,7 +4,7 @@ from .unitsample_kd import _unitsample_kd
 from .utils import _check_N_samples
 
 
-def gridsample(*edgearrays, f, N_samples=None, seed=None):
+def _gridsample(*edgearrays, f, N_samples=None, seed=None):
     """Draw sample(s) from density function defined on k-D grid.
     
     Given a k-dimensional grid shaped :math:`(N_0, N_1, ..., N_{k-1})`, the user
