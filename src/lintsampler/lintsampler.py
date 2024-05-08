@@ -327,6 +327,8 @@ class LintSampler:
 
         # 2. a list of tuples defining multiple arrays
         # i.e. cells = [(np.linspace(-12,0,100),np.linspace(-4,0,50)),(np.linspace(0,12,100),np.linspace(0,4,50))]
+        # or a list og grids that have been preconstructed and stacked,
+        # i.e. [np.stack(np.meshgrid(np.linspace(-12,0,100),np.linspace(-4,0,50), indexing='ij'), axis=-1),np.stack(np.meshgrid(np.linspace(0,12,100),np.linspace(0,4,50), indexing='ij'), axis=-1)]
         if isinstance(cells,list):
             self.eval_type = 'freesample'
 
