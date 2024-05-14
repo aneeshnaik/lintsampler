@@ -116,7 +116,84 @@ class LintSampler:
         # set up the sampling grid under the hood
         self._setgrid(cells)
 
+    def _evaluate_gridded_pdf(self,funcargs=()):
+        """Evaluate the pdf, handling the flag for vectorized.
+        
+        Parameters
+        ------------
+        self : LintSampler
+            The LintSampler instance.
 
+            
+        """
+        # tally the number of gridpoints
+        ngridpoints = np.prod(self.edgedims)
+
+        # create the flattened grid for evaluation in k>1 case
+        if self.dim > 1: 
+            edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(np.prod(self.edgedims), self.dim)
+
+        # reshape the grid: assumes function takes same number of arguments as dimensions
+        if self.vectorizedpdf:
+            if self.dim > 1:
+                evalf = self.pdf(edgegrid,*funcargs).reshape(*self.edgedims)
+            else:
+                evalf = self.pdf(self.edgearrays,*funcargs)
+
+        else:
+            # iterate over the all gridpoints
+            evalf = np.zeros(ngridpoints)
+            for gridpoint in range(0,ngridpoints):
+                if self.dim > 1:
+                    evalf[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
+                else:
+                    evalf[gridpoint] = self.pdf(edgegrid[gridpoint],*funcargs)
+            
+        # reshape back to grid
+        if self.dim > 1:
+            evalf = evalf.reshape(*self.edgedims)
+
+        return evalf
+    
+    def _evaluate_free_pdf(self,ngrid=None,funcargs=()):
+        """
+        """
+
+        # evaluate all points on the initial input grid and reshape
+        if self.vectorizedpdf:
+
+            if ngrid == None:
+                evalfgrid = self.pdf(self.edgearrays,*funcargs).reshape(self.gridshape[0:self.dim])
+            else:
+                evalfgrid = self.pdf(self.edgearrays[ngrid],*funcargs).reshape(self.gridshape[ngrid][0:self.dim])
+
+        else: # non-vectorised pdf
+            # flatten the arrays and pass to pdf
+            # tally the number of gridpoints
+            if ngrid == None:
+                ngridpoints = np.prod(self.edgedims)
+
+                # create the flattened grid for evaluation
+                edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
+            else:
+                ngridpoints = self.ngridentries[ngrid]
+
+                # create the flattened grid for evaluation
+                edgegrid = np.stack(np.meshgrid(*(self.edgearrays[ngrid]), indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
+
+
+            # call the pdf
+            evalfgrid = np.zeros(ngridpoints)
+            for gridpoint in range(0,ngridpoints):
+                evalfgrid[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
+            
+            # reshape back to the grid
+            if ngrid == None:
+                evalfgrid = evalfgrid.reshape(self.gridshape[0:self.dim])
+            else:
+                evalfgrid = evalfgrid.reshape(self.gridshape[ngrid][0:self.dim])
+
+        return evalfgrid
 
     def sample(self, N_samples=None, funcargs=()):
         """Draw samples from the pdf on the constructed grid(s).
@@ -150,39 +227,17 @@ class LintSampler:
         if self.eval_type == 'gridsample':
 
             if self.dim > 1:
-                # tally the number of gridpoints
-                ngridpoints = np.prod(self.edgedims)
-
-                # create the flattened grid for evaluation
-                edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
-
-                # reshape the grid: assumes function takes same number of arguments as dimensions
-                if self.vectorizedpdf:
-                    evalf = self.pdf(edgegrid,*funcargs).reshape(*self.edgedims)
-                else:
-                    # iterate over the all gridpoints
-                    evalf = np.zeros(ngridpoints)
-                    for gridpoint in range(0,ngridpoints):
-                        evalf[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
-                    
-                    # reshape back to grid
-                    evalf = evalf.reshape(*self.edgedims)
-
+                
+                # evaluate the pdf
+                evalf = self._evaluate_gridded_pdf(funcargs)
 
                 # call the gridded sampler
                 X = _gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
 
             else: 
-                # the 1d case: no flattening needed
-                if self.vectorizedpdf:
-                    evalf = self.pdf(self.edgearrays,*funcargs)
-                else:
-                    # iterate over the all gridpoints
-                    evalf = np.zeros(ngridpoints)
-                    for gridpoint in range(0,ngridpoints):
-                        evalf[gridpoint] = self.pdf(edgegrid[gridpoint],*funcargs)
 
-                    # no need to reshape!
+                # evaluate the pdf
+                evalf = self._evaluate_gridded_pdf(funcargs)
 
                 # call the gridded sampler
                 X = _gridsample(self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
@@ -204,26 +259,10 @@ class LintSampler:
 
                 # in case of a single grid being passed:
                 if self.ngrids == 0:
-                    # evaluate all points on the initial input grid and reshape
-                    if self.vectorizedpdf:
-                        evalfgrid = self.pdf(self.edgearrays,*funcargs).reshape(self.gridshape[0:self.dim])
-                    else:
-                        # flatten the arrays and pass to pdf
-                        # tally the number of gridpoints
-                        ngridpoints = np.prod(self.edgedims)
 
-                        # create the flattened grid for evaluation
-                        edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
-
-                        # call the pdf
-                        evalfgrid = np.zeros(ngridpoints)
-                        for gridpoint in range(0,ngridpoints):
-                            evalfgrid[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
-                        
-                        # reshape back to the grid
-                        evalfgrid = evalfgrid.reshape(self.gridshape[0:self.dim])
-
-
+                    # evaluate the pdf
+                    evalfgrid = self._evaluate_free_pdf(None,funcargs)
+                    
                     # now get the values corners: there will be 2^dim of them
                     corners = []
                     for combo in combinations: 
@@ -242,33 +281,15 @@ class LintSampler:
                 # multiple grids have been passed
                 else:
 
-                    #raise NotImplementedError("LintSampler: freesample with ngrids>=1 to be implemented.")
-
                     evalfgrid = []
                     allcorners = []
                     for ngrid in range(0,self.ngrids):
                         allcorners.append([]) # make a list of lists, to later concatenate
 
-                        if self.vectorizedpdf:
-                            evalfgrid.append(self.pdf(self.edgearrays[ngrid],*funcargs).reshape(self.gridshape[ngrid][0:self.dim]))
-                        else:
-                            # flatten the arrays and pass to pdf
-                            # tally the number of gridpoints
-                            ngridpoints = self.ngridentries[ngrid]
-
-                            # create the flattened grid for evaluation
-                            edgegrid = np.stack(np.meshgrid(*(self.edgearrays[ngrid]), indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
-
-                            # call the pdf
-                            tmpevalfgrid = np.zeros(ngridpoints)
-                            for gridpoint in range(0,ngridpoints):
-                                evalfgrid[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
-                            
-                            # reshape back to the grid
-                            tmpevalfgrid = tmpevalfgrid.reshape(self.gridshape[ngrid][0:self.dim])
-
-                            # assign to list
-                            evalfgrid.append(tmpevalfgrid)
+                        tmpevalfgrid = self._evaluate_free_pdf(ngrid,funcargs)
+                        
+                        # assign to list
+                        evalfgrid.append(tmpevalfgrid)
 
 
                         for combo in combinations: 
