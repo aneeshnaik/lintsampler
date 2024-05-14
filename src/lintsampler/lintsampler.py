@@ -62,36 +62,56 @@ class LintSampler:
     samples within the grid.
     """
 
-    def __init__(self, pdf, cells=(), rngseed=42):
+    def __init__(self, pdf, cells=(), rnginput=None, vectorizedpdf=False):
         """Initialise a LintSampler instance.
 
         Parameters
         ----------
         pdf : function
-            pdf needs to take an input with dimension [...,k] where k is the number of dimensions
+            Probability density function from which to draw samples.
 
         cells : tuple of arrays or list of tuples of arrays
             If a tuple of arrays, the boundary values for a grid with dimensionality of the length
             of the tuple. If a list of tuples of arrays, the boundary values for an arbitrary
             number of grids with dimensionality the length of the tuples.
 
-        rngseed : {None, int, ``numpy.random.Generator``}, optional
+        rnginput : {None, int, ``numpy.random.Generator``}, optional
             Seed for ``numpy`` random generator. Can be random generator itself, in
-            which case it is left unchanged. Default is None, in which case new
+            which case it is left unchanged. Can also be the seed to a default generator.
+            Default is None, in which case new
             default generator is created. See ``numpy`` random generator docs for
             more information.
+
+        vectorizedpdf : boolean
+            if True, assumes that the pdf passed is vectorized (i.e. can accept [...,k]-shaped arguments).
+            if False, assumes that the pdf passed accepts k arguments.
 
         Returns
         -------
         None
+
+
+        Attributes
+        --------
+        pdf : function
+        rng : ``numpy`` random generator
+        vectorizedpdf : boolean
 
         """
 
         # set the pdf to be widely accessible
         self.pdf = pdf
 
-        # set the random seed
-        self.rng = np.random.default_rng(rngseed)
+        # set the random number generator
+        if isinstance(rnginput,np.random._generator.Generator):
+            self.rng = rnginput
+        elif rnginput==None:
+            self.rng = np.random.default_rng(42)
+        else:
+            self.rng = np.random.default_rng(rnginput)
+
+        # set the pdf optimisation flag
+        self.vectorizedpdf = vectorizedpdf
 
         # set up the sampling grid under the hood
         self._setgrid(cells)
@@ -130,19 +150,41 @@ class LintSampler:
         if self.eval_type == 'gridsample':
 
             if self.dim > 1:
+                # tally the number of gridpoints
+                ngridpoints = np.prod(self.edgedims)
+
                 # create the flattened grid for evaluation
-                edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(np.prod(self.edgedims), self.dim)
+                edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
 
                 # reshape the grid: assumes function takes same number of arguments as dimensions
-                evalf = self.pdf(edgegrid,*funcargs).reshape(*self.edgedims)
+                if self.vectorizedpdf:
+                    evalf = self.pdf(edgegrid,*funcargs).reshape(*self.edgedims)
+                else:
+                    # iterate over the all gridpoints
+                    evalf = np.zeros(ngridpoints)
+                    for gridpoint in range(0,ngridpoints):
+                        evalf[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
+                    
+                    # reshape back to grid
+                    evalf = evalf.reshape(*self.edgedims)
+
 
                 # call the gridded sampler
                 X = _gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
 
             else: 
                 # the 1d case: no flattening needed
-                evalf = self.pdf(self.edgearrays,*funcargs)
+                if self.vectorizedpdf:
+                    evalf = self.pdf(self.edgearrays,*funcargs)
+                else:
+                    # iterate over the all gridpoints
+                    evalf = np.zeros(ngridpoints)
+                    for gridpoint in range(0,ngridpoints):
+                        evalf[gridpoint] = self.pdf(edgegrid[gridpoint],*funcargs)
 
+                    # no need to reshape!
+
+                # call the gridded sampler
                 X = _gridsample(self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
 
             return X
@@ -163,7 +205,24 @@ class LintSampler:
                 # in case of a single grid being passed:
                 if self.ngrids == 0:
                     # evaluate all points on the initial input grid and reshape
-                    evalfgrid = self.pdf(self.edgearrays,*funcargs).reshape(self.gridshape[0:self.dim])
+                    if self.vectorizedpdf:
+                        evalfgrid = self.pdf(self.edgearrays,*funcargs).reshape(self.gridshape[0:self.dim])
+                    else:
+                        # flatten the arrays and pass to pdf
+                        # tally the number of gridpoints
+                        ngridpoints = np.prod(self.edgedims)
+
+                        # create the flattened grid for evaluation
+                        edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
+
+                        # call the pdf
+                        evalfgrid = np.zeros(ngridpoints)
+                        for gridpoint in range(0,ngridpoints):
+                            evalfgrid[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
+                        
+                        # reshape back to the grid
+                        evalfgrid = evalfgrid.reshape(self.gridshape[0:self.dim])
+
 
                     # now get the values corners: there will be 2^dim of them
                     corners = []
@@ -180,6 +239,7 @@ class LintSampler:
 
                         corners.append(evalfgrid[tuple(arrslice)].flatten())
                     
+                # multiple grids have been passed
                 else:
 
                     #raise NotImplementedError("LintSampler: freesample with ngrids>=1 to be implemented.")
@@ -188,7 +248,28 @@ class LintSampler:
                     allcorners = []
                     for ngrid in range(0,self.ngrids):
                         allcorners.append([]) # make a list of lists, to later concatenate
-                        evalfgrid.append(self.pdf(self.edgearrays[ngrid],*funcargs).reshape(self.gridshape[ngrid][0:self.dim]))
+
+                        if self.vectorizedpdf:
+                            evalfgrid.append(self.pdf(self.edgearrays[ngrid],*funcargs).reshape(self.gridshape[ngrid][0:self.dim]))
+                        else:
+                            # flatten the arrays and pass to pdf
+                            # tally the number of gridpoints
+                            ngridpoints = self.ngridentries[ngrid]
+
+                            # create the flattened grid for evaluation
+                            edgegrid = np.stack(np.meshgrid(*(self.edgearrays[ngrid]), indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
+
+                            # call the pdf
+                            tmpevalfgrid = np.zeros(ngridpoints)
+                            for gridpoint in range(0,ngridpoints):
+                                evalfgrid[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
+                            
+                            # reshape back to the grid
+                            tmpevalfgrid = tmpevalfgrid.reshape(self.gridshape[ngrid][0:self.dim])
+
+                            # assign to list
+                            evalfgrid.append(tmpevalfgrid)
+
 
                         for combo in combinations: 
 
@@ -327,7 +408,7 @@ class LintSampler:
 
         # 2. a list of tuples defining multiple arrays
         # i.e. cells = [(np.linspace(-12,0,100),np.linspace(-4,0,50)),(np.linspace(0,12,100),np.linspace(0,4,50))]
-        # or a list og grids that have been preconstructed and stacked,
+        # or a list of grids that have been preconstructed and stacked,
         # i.e. [np.stack(np.meshgrid(np.linspace(-12,0,100),np.linspace(-4,0,50), indexing='ij'), axis=-1),np.stack(np.meshgrid(np.linspace(0,12,100),np.linspace(0,4,50), indexing='ij'), axis=-1)]
         if isinstance(cells,list):
             self.eval_type = 'freesample'
@@ -386,7 +467,7 @@ class LintSampler:
                 self.ngridentries.append(np.prod(grid.shape[0:self.dim]))
                 self.nedgegridentries.append(np.prod(np.array(grid.shape[0:self.dim])-1))
 
-                # flatten the grid into a [...,dim] array for passing to .pdf
+                # flatten the grid into a [...,dim] array for passing to pdf
                 self.edgearrays.append(grid.reshape(self.ngridentries[ngrid],self.dim))
             
             self.x0 = np.vstack([grids[ngrid][tuple([slice(0,self.gridshape[ngrid][griddim]-1) for griddim in range(0,self.dim)])].reshape((self.nedgegridentries[ngrid],self.dim)) for ngrid in range(0,self.ngrids)])
