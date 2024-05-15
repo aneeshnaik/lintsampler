@@ -183,7 +183,7 @@ class LintSampler:
             # call the pdf
             evalfgrid = np.zeros(ngridpoints)
             for gridpoint in range(0,ngridpoints):
-                evalfgrid[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
+                evalfgrid[gridpoint] = self.pdf(edgegrid[gridpoint],*funcargs)
             
             # reshape back to the grid
             if ngrid == None:
@@ -425,6 +425,28 @@ class LintSampler:
             for d in range(0,self.dim):
                 self.edgearrays.append(cells[d])
                 self.edgedims[d] = len(cells[d])
+
+        # 1b. We have been passed the grid already, and need to dissasemble it for _gridsample
+        elif isinstance(cells,np.ndarray): # this will not catch 1d, because we have already caught that
+
+            # set the evaluation type
+            self.eval_type = 'gridsample'
+
+            # infer the dimensionality
+            self.dim = cells.shape[-1]
+
+            # keep track of the extent in each dimension
+            self.edgedims = cells.shape[0:self.dim]
+
+            # keep track of the edgearrays
+            self.edgearrays = []
+            for d in range(0,self.dim):
+                # get the unique values in each dimension stack
+                index = [0]*(self.dim+1)
+                index[d] = slice(None)
+                index[-1] = d
+                self.edgearrays.append(cells[tuple(index)])
+
 
         # 2. a list of tuples defining multiple arrays
         # i.e. cells = [(np.linspace(-12,0,100),np.linspace(-4,0,50)),(np.linspace(0,12,100),np.linspace(0,4,50))]
