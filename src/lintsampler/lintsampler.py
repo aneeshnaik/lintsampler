@@ -393,7 +393,7 @@ class LintSampler:
 
         # 0. are we in the 1d case? the input is just a single tuple or 1d array.
         # i.e. cells = np.linspace(-12,12,100)
-        if hasattr(cells, "__len__") and not hasattr(cells[0], "__len__")
+        if hasattr(cells, "__len__") and not hasattr(cells[0], "__len__"):
             self.eval_type='gridsample'
 
             # override the inferred dimensionality
