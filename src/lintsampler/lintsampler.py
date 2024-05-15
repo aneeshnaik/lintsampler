@@ -145,10 +145,7 @@ class LintSampler:
             # iterate over the all gridpoints
             evalf = np.zeros(ngridpoints)
             for gridpoint in range(0,ngridpoints):
-                if self.dim > 1:
-                    evalf[gridpoint] = self.pdf(*edgegrid[gridpoint],*funcargs)
-                else:
-                    evalf[gridpoint] = self.pdf(edgegrid[gridpoint],*funcargs)
+                evalf[gridpoint] = self.pdf(edgegrid[gridpoint],*funcargs)
             
         # reshape back to grid
         if self.dim > 1:
@@ -175,12 +172,12 @@ class LintSampler:
                 ngridpoints = np.prod(self.edgedims)
 
                 # create the flattened grid for evaluation
-                edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
+                edgegrid = np.stack(np.meshgrid(self.edgearrays, indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
             else:
                 ngridpoints = self.ngridentries[ngrid]
 
                 # create the flattened grid for evaluation
-                edgegrid = np.stack(np.meshgrid(*(self.edgearrays[ngrid]), indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
+                edgegrid = np.stack(np.meshgrid((self.edgearrays[ngrid]), indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
 
 
             # call the pdf
