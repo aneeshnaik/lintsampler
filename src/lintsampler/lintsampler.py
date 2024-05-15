@@ -410,7 +410,7 @@ class LintSampler:
         elif isinstance(cells,tuple):
 
             if not (hasattr(cells[0], "__len__") and not hasattr(cells[0][0], "__len__")):
-                raise ValueError("LintSampler: Cells must be a single tuple of 1D sequences (arrays, lists, or tuples).")
+                raise TypeError("LintSampler: Cells must be a single tuple of 1D sequences (arrays, lists, or tuples).")
             
             # infer the dimensionality
             self.dim = len(cells)
