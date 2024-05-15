@@ -62,7 +62,7 @@ class LintSampler:
     samples within the grid.
     """
 
-    def __init__(self, pdf, cells=(), rnginput=None, vectorizedpdf=False):
+    def __init__(self, pdf, cells, rnginput=None, vectorizedpdf=False):
         """Initialise a LintSampler instance.
 
         Parameters
@@ -70,10 +70,11 @@ class LintSampler:
         pdf : function
             Probability density function from which to draw samples.
 
-        cells : tuple of arrays or list of tuples of arrays
-            If a tuple of arrays, the boundary values for a grid with dimensionality of the length
-            of the tuple. If a list of tuples of arrays, the boundary values for an arbitrary
-            number of grids with dimensionality the length of the tuples.
+        cells : single array, tuple of arrays or list of tuples of arrays
+            If a single array, the boundary values for a 1D grid. If a tuple of arrays, the
+            boundary values for a grid with dimensionality of the length of the tuple. If
+            a list of tuples of arrays, the boundary values for an arbitrary number of
+            grids with dimensionality the length of the tuples.
 
         rnginput : {None, int, ``numpy.random.Generator``}, optional
             Seed for ``numpy`` random generator. Can be random generator itself, in
@@ -348,10 +349,11 @@ class LintSampler:
         ----------
         self : LintSampler
             The LintSampler instance.
-        cells : tuple of arrays or list of tuples of arrays
-            If a tuple of arrays, the boundary values for a grid with dimensionality of the length
-            of the tuple. If a list of tuples of arrays, the boundary values for an arbitrary
-            number of grids with dimensionality the length of the tuples.
+        cells : single array, tuple of arrays or list of tuples of arrays
+            If a single array, the boundary values for a 1D grid. If a tuple of arrays, the
+            boundary values for a grid with dimensionality of the length of the tuple. If
+            a list of tuples of arrays, the boundary values for an arbitrary number of
+            grids with dimensionality the length of the tuples.
 
         Returns
         -------
@@ -385,13 +387,13 @@ class LintSampler:
 
         # check the validity of the input
         if len(cells)==0:
-            raise ValueError("LintSampler._setgrid: you must specify an evaluation domain with a tuple of arrays or a list of tuples of arrays. See documentation for details.")
+            raise ValueError("LintSampler._setgrid: you must specify an evaluation domain with a single array, a tuple of arrays or a list of tuples of arrays. See documentation for details.")
             # or, we could here drop into an adaptive grid selection
             # or, we could sample on a unit hypercube with dimensions of the pdf
 
         # 0. are we in the 1d case? the input is just a single tuple or 1d array.
         # i.e. cells = np.linspace(-12,12,100)
-        if (isinstance(cells[0],float) | (isinstance(cells[0],int))): # do we need the integer option here? I think no?
+        if hasattr(cells, "__len__") and not hasattr(cells[0], "__len__")
             self.eval_type='gridsample'
 
             # override the inferred dimensionality
@@ -399,16 +401,16 @@ class LintSampler:
 
             # set the arrays
             # we are being passed the array directly
-            self.edgearrays = cells
+            self.edgearrays = np.array(cells)
             self.edgedims = len(cells)
 
 
         # 1. tuples defining the array -> make arrays, pass to gridsample
         # i.e. cells = (np.linspace(-12,12,100),np.linspace(-4,4,50))
-        if isinstance(cells,tuple):
+        elif isinstance(cells,tuple):
 
-            if isinstance(cells[0],tuple):
-                raise ValueError("LintSampler: Cells must be a single tuple or a list of tuples (i.e. not a tuple of tuples).")
+            if not (hasattr(cells[0], "__len__") and not hasattr(cells[0][0], "__len__")):
+                raise ValueError("LintSampler: Cells must be a single tuple of 1D sequences (arrays, lists, or tuples).")
             
             # infer the dimensionality
             self.dim = len(cells)
@@ -431,7 +433,7 @@ class LintSampler:
         # i.e. cells = [(np.linspace(-12,0,100),np.linspace(-4,0,50)),(np.linspace(0,12,100),np.linspace(0,4,50))]
         # or a list of grids that have been preconstructed and stacked,
         # i.e. [np.stack(np.meshgrid(np.linspace(-12,0,100),np.linspace(-4,0,50), indexing='ij'), axis=-1),np.stack(np.meshgrid(np.linspace(0,12,100),np.linspace(0,4,50), indexing='ij'), axis=-1)]
-        if isinstance(cells,list):
+        elif isinstance(cells,list):
             self.eval_type = 'freesample'
 
             # variable controlling whether grids have already been constructed or not
