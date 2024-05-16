@@ -133,13 +133,12 @@ class LintSampler:
         # create the flattened grid for evaluation in k>1 case
         if self.dim > 1: 
             edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(np.prod(self.edgedims), self.dim)
+        else:
+            edgegrid = self.edgearrays[0]
 
         # reshape the grid: assumes function takes same number of arguments as dimensions
         if self.vectorizedpdf:
-            if self.dim > 1:
-                evalf = self.pdf(edgegrid,*funcargs).reshape(*self.edgedims)
-            else:
-                evalf = self.pdf(self.edgearrays,*funcargs)
+            evalf = self.pdf(edgegrid,*funcargs).reshape(*self.edgedims)
 
         else:
             # iterate over the all gridpoints
@@ -224,21 +223,11 @@ class LintSampler:
 
         if self.eval_type == 'gridsample':
 
-            if self.dim > 1:
-                
-                # evaluate the pdf
-                evalf = self._evaluate_gridded_pdf(funcargs)
+            # evaluate the pdf
+            evalf = self._evaluate_gridded_pdf(funcargs)
 
-                # call the gridded sampler
-                X = _gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
-
-            else: 
-
-                # evaluate the pdf
-                evalf = self._evaluate_gridded_pdf(funcargs)
-
-                # call the gridded sampler
-                X = _gridsample(self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
+            # call the gridded sampler
+            X = _gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
 
             return X
 
@@ -341,7 +330,7 @@ class LintSampler:
             The inferred dimensionality of the problem
         edgearrays : list of numpy arrays
             The arrays defining the edge of the grids
-        edgedims   : list of integers, optional, used if eval_type == 'gridsample'
+        edgedims   : tuple of integers, optional, used if eval_type == 'gridsample'
             The shape of the gridsample grid
         ngrids : integer, optional, used if eval_type == 'freesample'
             The number of distinct grids to be constructed
@@ -375,8 +364,8 @@ class LintSampler:
 
             # set the arrays
             # we are being passed the array directly
-            self.edgearrays = np.array(cells)
-            self.edgedims = len(cells)
+            self.edgearrays = [np.array(cells)]
+            self.edgedims = (len(cells),)
 
 
         # 1. tuples defining the array -> make arrays, pass to gridsample
@@ -396,12 +385,12 @@ class LintSampler:
             self.edgearrays = []
 
             # keep track of the dimensions
-            self.edgedims = np.ones(self.dim,dtype='int')
+            self.edgedims = ()
 
             # create the grid
             for d in range(0,self.dim):
                 self.edgearrays.append(cells[d])
-                self.edgedims[d] = len(cells[d])
+                self.edgedims += (len(cells[d]),)
 
         # 1b. We have been passed the grid already, and need to dissasemble it for _gridsample
         elif isinstance(cells,np.ndarray): # this will not catch 1d, because we have already caught that
