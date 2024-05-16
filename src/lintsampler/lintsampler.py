@@ -389,7 +389,7 @@ class LintSampler:
 
             # create the grid
             for d in range(0,self.dim):
-                self.edgearrays.append(cells[d])
+                self.edgearrays.append(np.array(cells[d]))
                 self.edgedims += (len(cells[d]),)
 
         # 1b. We have been passed the grid already, and need to dissasemble it for _gridsample
