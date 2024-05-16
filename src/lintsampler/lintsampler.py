@@ -255,58 +255,35 @@ class LintSampler:
                 # get all combinations of starting and ending corner points (only depends on dimension)
                 combinations = self._get_startend_points()
 
-                # in case of a single grid being passed:
-                if self.ngrids == 0:
+                # loop through the grids
+                evalfgrid = []
+                allcorners = []
+                for ngrid in range(0,self.ngrids):
+                    allcorners.append([]) # make a list of lists, to later concatenate
 
-                    # evaluate the pdf
-                    evalfgrid = self._evaluate_free_pdf(None,funcargs)
+                    tmpevalfgrid = self._evaluate_free_pdf(ngrid,funcargs)
                     
-                    # now get the values corners: there will be 2^dim of them
-                    corners = []
+                    # assign to list
+                    evalfgrid.append(tmpevalfgrid)
+
+
                     for combo in combinations: 
 
                         arrslice = []
                         for griddim,entry in enumerate(combo):
 
                             if entry==0:
-                                arrslice.append(slice(0,self.gridshape[griddim]-1))
+                                arrslice.append(slice(0,self.gridshape[ngrid][griddim]-1))
 
                             else: # must be a 1
-                                arrslice.append(slice(1,self.gridshape[griddim]))
+                                arrslice.append(slice(1,self.gridshape[ngrid][griddim]))
 
-                        corners.append(evalfgrid[tuple(arrslice)].flatten())
-                    
-                # multiple grids have been passed
-                else:
+                        allcorners[ngrid].append(evalfgrid[ngrid][tuple(arrslice)].flatten())
 
-                    evalfgrid = []
-                    allcorners = []
-                    for ngrid in range(0,self.ngrids):
-                        allcorners.append([]) # make a list of lists, to later concatenate
-
-                        tmpevalfgrid = self._evaluate_free_pdf(ngrid,funcargs)
-                        
-                        # assign to list
-                        evalfgrid.append(tmpevalfgrid)
-
-
-                        for combo in combinations: 
-
-                            arrslice = []
-                            for griddim,entry in enumerate(combo):
-
-                                if entry==0:
-                                    arrslice.append(slice(0,self.gridshape[ngrid][griddim]-1))
-
-                                else: # must be a 1
-                                    arrslice.append(slice(1,self.gridshape[ngrid][griddim]))
-
-                            allcorners[ngrid].append(evalfgrid[ngrid][tuple(arrslice)].flatten())
-
-                    # now go back through and remake the corners to stack everything up
-                    corners = []
-                    for ncombo in range(0,len(combinations)):
-                        corners.append(np.hstack([allcorners[ngrid][ncombo] for ngrid in range(0,self.ngrids)]))
+                # now go back through and remake the corners to stack everything up
+                corners = []
+                for ncombo in range(0,len(combinations)):
+                    corners.append(np.hstack([allcorners[ngrid][ncombo] for ngrid in range(0,self.ngrids)]))
 
 
             # do the sampling
