@@ -298,7 +298,7 @@ class LintSampler:
 
 
         else:
-            raise ValueError("LintSampler.sample: eval_type is expected to be either gridsample or freesample.")
+            raise ValueError(f"LintSampler.sample: eval_type is expected to be either gridsample or freesample.")
 
         pass
 
@@ -366,7 +366,7 @@ class LintSampler:
 
         # check the validity of the input
         if len(cells)==0:
-            raise ValueError("LintSampler._setgrid: you must specify an evaluation domain with a single array, a tuple of arrays or a list of tuples of arrays. See documentation for details.")
+            raise ValueError(f"LintSampler._setgrid: you must specify an evaluation domain with a single array, a tuple of arrays or a list of tuples of arrays. See documentation for details.")
             # or, we could here drop into an adaptive grid selection
             # or, we could sample on a unit hypercube with dimensions of the pdf
 
@@ -389,7 +389,7 @@ class LintSampler:
         elif isinstance(cells,tuple):
 
             if not (hasattr(cells[0], "__len__") and not hasattr(cells[0][0], "__len__")):
-                raise TypeError("LintSampler: Cells must be a single tuple of 1D sequences (arrays, lists, or tuples).")
+                raise TypeError(f"LintSampler._setgrid: Cells must be a single tuple of 1D sequences (arrays, lists, or tuples).")
             
             # infer the dimensionality
             self.dim = len(cells)
@@ -457,7 +457,7 @@ class LintSampler:
             elif hasattr(cells[0], "__len__") and not hasattr(cells[0][0], "__len__"):
                 self.dim = 1
             else:
-                raise ValueError("Input cells do not make sense.")
+                raise ValueError(f"LintSampler._setgrid: Input cells do not make sense.")
 
             # create holding arrays
             grids                 = [] # the grids constructed from the inputs (no need to expose)
@@ -472,7 +472,7 @@ class LintSampler:
                 if _gridsconstructed:
                     # check that the grid has the same dimensionality as the others
                     if ((self.dim>1) & (cells[ngrid].shape[-1]!=self.dim)):
-                        raise ValueError("LintSampler._setgrid: All input grids must have the same dimensionality.")
+                        raise ValueError(f"LintSampler._setgrid: All input grids must have the same dimensionality.")
                     
                     grid = cells[ngrid]
 
