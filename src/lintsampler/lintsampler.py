@@ -118,12 +118,17 @@ class LintSampler:
         self._setgrid(cells)
 
     def _evaluate_gridded_pdf(self,funcargs=()):
-        """Evaluate the pdf, handling the flag for vectorized.
+        """Evaluate the pdf on a grid, handling the flag for vectorized.
         
         Parameters
         ------------
         self : LintSampler
             The LintSampler instance.
+
+        Returns
+        -----------
+        evalf: np.ndarray
+            The values of the pdf at the edge points of the grid.
 
             
         """
@@ -153,7 +158,18 @@ class LintSampler:
         return evalf
     
     def _evaluate_free_pdf(self,ngrid=None,funcargs=()):
-        """
+        """Evaluate the pdf for a set of cells, handling the flag for vectorized.
+
+        Parameters
+        ------------
+        self : LintSampler
+            The LintSampler instance.
+
+        Returns
+        -----------
+        evalfgrid: np.ndarray
+            The values of the pdf at the edge points of the grid.
+
         """
 
         # evaluate all points on the initial input grid and reshape
@@ -416,6 +432,8 @@ class LintSampler:
 
         # 2. a list of tuples defining multiple arrays
         # i.e. cells = [(np.linspace(-12,0,100),np.linspace(-4,0,50)),(np.linspace(0,12,100),np.linspace(0,4,50))]
+        # or in 1d case, a list of un-linked grids
+        # i.e. cells = [np.linspace(-12,0,100),np.linspace(2,12,100)]
         # or a list of grids that have been preconstructed and stacked,
         # i.e. [np.stack(np.meshgrid(np.linspace(-12,0,100),np.linspace(-4,0,50), indexing='ij'), axis=-1),np.stack(np.meshgrid(np.linspace(0,12,100),np.linspace(0,4,50), indexing='ij'), axis=-1)]
         elif isinstance(cells,list):
@@ -427,19 +445,24 @@ class LintSampler:
             # how many grid boundaries are we being handed?
             self.ngrids = len(cells)
 
+            # set a dummy dimension for case checking (also relevant for debugging?)
+            self.dim = 0
+
             # check if we are being passed grids already
             if isinstance(cells[0],np.ndarray):
                 _gridsconstructed = True
 
-            # infer the dimensionality: this will work whether the input is a single cell or list of cells
-            if _gridsconstructed:
-                self.dim = cells[0].shape[-1]
-            else:
-                self.dim = len(cells[0])
+                # check special case dimensionality: we are being passed multiple 1d grids
+                if (cells[0].shape[0] == cells[0].shape[-1]):
+                    self.dim = 1
 
-            # check special case dimensionality
-            if self.dim==1:
-                raise NotImplementedError("LintSampler: For 1d problems, the grid must be continuous (i.e. you cannot pass multiple grids).")
+            # infer the dimensionality: this will work whether the input is a single cell or list of cells
+            # only proceed with determination if not 1d case
+            if (self.dim == 0):
+                if _gridsconstructed:
+                    self.dim = cells[0].shape[-1]
+                else:
+                    self.dim = len(cells[0])
 
             # create holding arrays
             grids                 = [] # the grids constructed from the inputs (no need to expose)
@@ -450,11 +473,10 @@ class LintSampler:
 
             # loop through the boundaries, construct the grids, and flatten
             for ngrid in range(0,self.ngrids):
-
-                
+               
                 if _gridsconstructed:
                     # check that the grid has the same dimensionality as the others
-                    if cells[ngrid].shape[-1]!=self.dim:
+                    if ((self.dim>1) & (cells[ngrid].shape[-1]!=self.dim)):
                         raise ValueError("LintSampler._setgrid: All input grids must have the same dimensionality.")
                     
                     grid = cells[ngrid]
