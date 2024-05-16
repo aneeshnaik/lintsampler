@@ -445,24 +445,19 @@ class LintSampler:
             # how many grid boundaries are we being handed?
             self.ngrids = len(cells)
 
-            # set a dummy dimension for case checking (also relevant for debugging?)
-            self.dim = 0
-
-            # check if we are being passed grids already
-            if isinstance(cells[0],np.ndarray):
+            # infer dimensionality
+            # cells = list of tuples of 1D iterables
+            if isinstance(cells[0], tuple) and hasattr(cells[0][0], "__len__"):
+                self.dim = len(cells[0])
+            # cells = list of (k+1)-d grids (i.e. preconstructed k-d grids)
+            elif isinstance(cells[0], np.ndarray) and cells[0].ndim > 1:
                 _gridsconstructed = True
-
-                # check special case dimensionality: we are being passed multiple 1d grids
-                if (cells[0].shape[0] == cells[0].shape[-1]):
-                    self.dim = 1
-
-            # infer the dimensionality: this will work whether the input is a single cell or list of cells
-            # only proceed with determination if not 1d case
-            if (self.dim == 0):
-                if _gridsconstructed:
-                    self.dim = cells[0].shape[-1]
-                else:
-                    self.dim = len(cells[0])
+                self.dim = cells[0].shape[-1]
+            # cells = list of 1d iterables
+            elif hasattr(cells[0], "__len__") and not hasattr(cells[0][0], "__len__"):
+                self.dim = 1
+            else:
+                raise ValueError("Input cells do not make sense.")
 
             # create holding arrays
             grids                 = [] # the grids constructed from the inputs (no need to expose)
@@ -483,11 +478,14 @@ class LintSampler:
 
                 else:
                     # check that the dimensions are properly specified for the grid
-                    if len(cells[ngrid])!=self.dim:
-                        raise ValueError("LintSampler._setgrid: All input cells must have the same dimensionality.")
+                    if self.dim > 1 and len(cells[ngrid])!=self.dim:
+                        raise ValueError(f"LintSampler._setgrid: All input cells must have the same dimensionality.")
 
                     # construct the grid
-                    grid = np.stack(np.meshgrid(*cells[ngrid], indexing='ij'), axis=-1)
+                    if self.dim > 1:
+                        grid = np.stack(np.meshgrid(*cells[ngrid], indexing='ij'), axis=-1)
+                    else:
+                        grid = np.array(cells[ngrid])
 
                 # save the grid
                 grids.append(grid)
