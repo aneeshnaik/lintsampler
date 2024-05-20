@@ -1,5 +1,4 @@
-from .gridsample import gridsample
-from .sample import sample
+from .lintsampler import LintSampler
 from importlib.metadata import version, PackageNotFoundError
 
 try:
@@ -7,4 +6,4 @@ try:
 except PackageNotFoundError:
     __version__ = "unknown version"
 
-__all__ = ["gridsample", "sample"]
+__all__ = ["LintSampler"]

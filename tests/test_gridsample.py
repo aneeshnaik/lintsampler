@@ -327,3 +327,4 @@ def test_kd_gaussian_qmc_halton():
     mu = np.round(np.mean(x, axis=0), decimals=1)
     cov = np.round(np.cov(x.T), decimals=1)
     assert np.all(mu == mu_true) and np.all(cov == cov_true)
+

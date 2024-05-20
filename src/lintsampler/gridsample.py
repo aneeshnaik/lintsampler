@@ -5,7 +5,7 @@ from .unitsample_kd import _unitsample_kd
 from .utils import _check_N_samples, _generate_usamples, _choice
 
 
-def gridsample(
+def _gridsample(
     *edgearrays, f, N_samples=None, seed=None, qmc=False, qmc_engine=None
 ):
     """Draw sample(s) from density function defined on k-D grid.
