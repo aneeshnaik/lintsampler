@@ -5,7 +5,7 @@ from .unitsample_kd import _unitsample_kd
 from .utils import _check_N_samples, _generate_usamples, _choice
 
 
-def sample(
+def _freesample(
     x0, x1, *f, N_samples=None, seed=None,
     qmc=False, qmc_engine=None
 ):

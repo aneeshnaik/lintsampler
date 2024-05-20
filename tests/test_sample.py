@@ -647,3 +647,4 @@ def test_2D_GMM_qmc_halton():
     assert np.all(covb == covb_true)
     assert wa == wa_true
     assert wb == wb_true
+
