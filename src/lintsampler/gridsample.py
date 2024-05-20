@@ -111,14 +111,6 @@ def _gridsample(
     # check requested no. samples is None or positive int
     _check_N_samples(N_samples)
 
-    # warn if qmc engine provided but qmc off
-    if not qmc and qmc_engine is not None:
-        warnings.warn("Provided qmc_engine won't be used as qmc switched off.")
-    
-    # warn if qmc engine provided and RNG seed provided
-    if qmc_engine is not None and seed is not None:
-        warnings.warn("Provided random seed won't be used as qmc_engine provided.")
-
     # check edge arrs 1D, mono. increasing, and match corresponding f dim
     for i, a in enumerate(edgearrays):
         if a.ndim != 1:
