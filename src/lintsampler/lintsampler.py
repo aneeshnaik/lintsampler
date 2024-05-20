@@ -1,5 +1,5 @@
-
 import numpy as np
+import warnings
 from .gridsample import _gridsample
 from .freesample import _freesample
 
@@ -62,7 +62,11 @@ class LintSampler:
     samples within the grid.
     """
 
-    def __init__(self, pdf, cells, rnginput=None, vectorizedpdf=False):
+    def __init__(
+        self, pdf, cells,
+        seed=None, vectorizedpdf=False,
+        qmc=False, qmc_engine=None
+    ):
         """Initialise a LintSampler instance.
 
         Parameters
@@ -71,21 +75,33 @@ class LintSampler:
             Probability density function from which to draw samples.
 
         cells : single array, tuple of arrays or list of tuples of arrays
-            If a single array, the boundary values for a 1D grid. If a tuple of arrays, the
-            boundary values for a grid with dimensionality of the length of the tuple. If
-            a list of tuples of arrays, the boundary values for an arbitrary number of
-            grids with dimensionality the length of the tuples.
+            If a single array, the boundary values for a 1D grid. If a tuple of
+            arrays, the boundary values for a grid with dimensionality of the
+            length of the tuple. If a list of tuples of arrays, the boundary
+            values for an arbitrary number of grids with dimensionality the
+            length of the tuples.
 
-        rnginput : {None, int, ``numpy.random.Generator``}, optional
-            Seed for ``numpy`` random generator. Can be random generator itself, in
-            which case it is left unchanged. Can also be the seed to a default generator.
-            Default is None, in which case new
-            default generator is created. See ``numpy`` random generator docs for
-            more information.
+        seed : {None, int, ``numpy.random.Generator``}, optional
+            Seed for ``numpy`` random generator. Can be random generator itself,
+            in which case it is left unchanged. Can also be the seed to a
+            default generator. Default is None, in which case new default
+            generator is created. See ``numpy`` random generator docs for more
+            information.
 
         vectorizedpdf : boolean
             if True, assumes that the pdf passed is vectorized (i.e. can accept [...,k]-shaped arguments).
             if False, assumes that the pdf passed accepts k arguments.
+        
+        qmc : bool, optional
+            Whether to use Quasi-Monte Carlo sampling. Default is False.
+    
+        qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
+            QMC engine to use if qmc flag above is True. Should be subclass of
+            scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
+            first k dimensions are used for lintsampling, while last dimension is
+            used for cell choice (this happens even if only one cell is given).
+            Default is None. In that case, if qmc is True, then a scrambled Sobol
+            sequence is used.
 
         Returns
         -------
@@ -93,29 +109,69 @@ class LintSampler:
 
 
         Attributes
-        --------
+        ----------
         pdf : function
-        rng : ``numpy`` random generator
+        seed : None, int, or ``numpy`` random Generator
         vectorizedpdf : boolean
 
         """
 
-        # set the pdf to be widely accessible
+        # set args as attributes
         self.pdf = pdf
-
-        # set the random number generator
-        if isinstance(rnginput,np.random._generator.Generator):
-            self.rng = rnginput
-        elif rnginput==None:
-            self.rng = np.random.default_rng(42)
-        else:
-            self.rng = np.random.default_rng(rnginput)
-
-        # set the pdf optimisation flag
+        self.seed = seed
         self.vectorizedpdf = vectorizedpdf
+
+        # configure QMC according to given parameters
+        self._setqmc(qmc, qmc_engine)
 
         # set up the sampling grid under the hood
         self._setgrid(cells)
+    
+    def _setqmc(self, qmc, qmc_engine):
+        """Parse QMC-related parameters and set as attributes.
+        
+        Parameters
+        ----------
+
+        qmc : bool, optional
+            Whether to use Quasi-Monte Carlo sampling. Default is False.
+    
+        qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
+            QMC engine to use if qmc flag above is True. Should be subclass of
+            scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
+            first k dimensions are used for lintsampling, while last dimension is
+            used for cell choice (this happens even if only one cell is given).
+            Default is None. In that case, if qmc is True, then a scrambled Sobol
+            sequence is used.
+
+        Returns
+        -------
+        None
+        
+        Attributes
+        ----------
+        qmc : boolean
+        qmc_engine : None or ``scipy`` QMCEngine
+
+        """
+        # warn if qmc engine provided but qmc off
+        if not qmc and qmc_engine is not None:
+            warnings.warn(
+                "LintSampler.__init__: " \
+                "provided qmc_engine won't be used as qmc switched off."
+            )
+    
+        # warn if qmc engine provided and RNG seed provided
+        if qmc_engine is not None and self.seed is not None:
+            warnings.warn(
+                "LintSampler.__init__: " \
+                "provided random seed won't be used as qmc_engine provided."
+            )
+        
+        # store qmc flag and engine as attributes
+        self.qmc = qmc
+        self.qmc_engine = qmc_engine
+        return
 
     def _evaluate_gridded_pdf(self,funcargs=()):
         """Evaluate the pdf on a grid, handling the flag for vectorized.
@@ -243,7 +299,7 @@ class LintSampler:
             evalf = self._evaluate_gridded_pdf(funcargs)
 
             # call the gridded sampler
-            X = _gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.rng)
+            X = _gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.seed,qmc=self.qmc,qmc_engine=self.qmc_engine)
 
             return X
 
@@ -292,7 +348,7 @@ class LintSampler:
 
 
             # do the sampling
-            X = _freesample(self.x0,self.x1,*corners,N_samples=N_samples,seed=self.rng)
+            X = _freesample(self.x0,self.x1,*corners,N_samples=N_samples,seed=self.seed,qmc=self.qmc,qmc_engine=self.qmc_engine)
 
             return X
 

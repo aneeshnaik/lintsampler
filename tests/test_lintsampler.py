@@ -55,12 +55,12 @@ def neg_pdf_2D(x):
 def test_bad_seed():
     """Test that providing a nonsensical 'seed' raises an error."""
     with pytest.raises(TypeError):
-        LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, rnginput=42.5)
+        LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, seed=42.5).sample()
 
 
 def test_nonint_N_samples():
     """Test that providing a non-integer N_samples raises an error."""
-    sampler = LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, rnginput=42)
+    sampler = LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, seed=42)
     with pytest.raises(TypeError):
         sampler.sample(N_samples=10.0)
 
@@ -68,7 +68,7 @@ def test_nonint_N_samples():
 @pytest.mark.parametrize("N_samples", [0, -5])
 def test_bad_N_samples(N_samples):
     """Test that providing zero, or negative N_samples raises error."""
-    sampler = LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, rnginput=42)
+    sampler = LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, seed=42)
     with pytest.raises(ValueError):
         sampler.sample(N_samples=N_samples)
 
@@ -76,7 +76,7 @@ def test_bad_N_samples(N_samples):
 @pytest.mark.parametrize("cells", CELLS_1D)
 def test_1D_f_negative(cells):
     """Test error raised if f negative anywhere"""
-    sampler = LintSampler(neg_pdf_1D, cells, vectorizedpdf=True, rnginput=42)
+    sampler = LintSampler(neg_pdf_1D, cells, vectorizedpdf=True, seed=42)
     with pytest.raises(ValueError):
         sampler.sample()
 
@@ -84,7 +84,7 @@ def test_1D_f_negative(cells):
 @pytest.mark.parametrize("cells", CELLS_2D)
 def test_kD_f_negative(cells):
     """Test error raised if f negative anywhere"""
-    sampler = LintSampler(neg_pdf_2D, cells, vectorizedpdf=True, rnginput=42)
+    sampler = LintSampler(neg_pdf_2D, cells, vectorizedpdf=True, seed=42)
     with pytest.raises(ValueError):
         sampler.sample()
 
@@ -92,7 +92,7 @@ def test_kD_f_negative(cells):
 @pytest.mark.parametrize("cells", BAD_CELLS)
 def test_1D_edges_non_monotonic(cells):
     """Test error raised if f negative anywhere"""
-    sampler = LintSampler(norm.pdf, cells, vectorizedpdf=True, rnginput=42)
+    sampler = LintSampler(norm.pdf, cells, vectorizedpdf=True, seed=42)
     with pytest.raises(ValueError):
         sampler.sample()
 
@@ -101,11 +101,12 @@ def test_1D_edges_non_monotonic(cells):
 
 
 @pytest.mark.parametrize("cells", CELLS_1D)
-@pytest.mark.parametrize("N_samples", [None, 10])
+@pytest.mark.parametrize("N_samples", [None, 16])
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
-def test_1D_output_shapes(cells, N_samples, vectorizedpdf):
+@pytest.mark.parametrize("qmc", [True, False])
+def test_1D_output_shapes(cells, N_samples, vectorizedpdf, qmc):
     """Single sample in 1D -> float, multiple samples -> 1D array"""
-    sampler = LintSampler(norm.pdf, cells, vectorizedpdf=vectorizedpdf, rnginput=42)
+    sampler = LintSampler(norm.pdf, cells, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
     x = sampler.sample(N_samples=N_samples)
     if N_samples is None:
         assert isinstance(x, float)
@@ -114,12 +115,13 @@ def test_1D_output_shapes(cells, N_samples, vectorizedpdf):
 
 
 @pytest.mark.parametrize("cells", CELLS_2D)
-@pytest.mark.parametrize("N_samples", [None, 10])
+@pytest.mark.parametrize("N_samples", [None, 16])
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
-def test_kD_output_shapes(cells, N_samples, vectorizedpdf):
+@pytest.mark.parametrize("qmc", [True, False])
+def test_kD_output_shapes(cells, N_samples, vectorizedpdf, qmc):
     """Single sample in kD -> k-vector, multiple samples -> 2D array (N, k)"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    sampler = LintSampler(dist.pdf, cells, vectorizedpdf=vectorizedpdf, rnginput=42)
+    sampler = LintSampler(dist.pdf, cells, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
     x = sampler.sample(N_samples=N_samples)
     if N_samples is None:
         assert x.shape == (2,)
