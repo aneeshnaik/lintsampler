@@ -18,11 +18,6 @@ XY00_GRID = np.stack(np.meshgrid(X0_EDGES, Y0_EDGES, indexing='ij'), axis=-1)
 XY01_GRID = np.stack(np.meshgrid(X0_EDGES, Y1_EDGES, indexing='ij'), axis=-1)
 XY10_GRID = np.stack(np.meshgrid(X1_EDGES, Y0_EDGES, indexing='ij'), axis=-1)
 XY11_GRID = np.stack(np.meshgrid(X1_EDGES, Y1_EDGES, indexing='ij'), axis=-1)
-BAD_CELLS = [
-    np.array([1.0, 1.5, 1.5, 2.0]),
-    np.ones(10),
-    np.array([9.0, 8.0, 10.0, 12.0]),
-]
 CELLS_1D = [
     X_EDGES, 
     tuple(X_EDGES),
@@ -41,6 +36,73 @@ CELLS_2D = [
     [(list(X0_EDGES), list(Y0_EDGES)), (list(X0_EDGES), list(Y1_EDGES)), (list(X1_EDGES), list(Y0_EDGES)), (list(X1_EDGES), list(Y1_EDGES))],
     [XY00_GRID, XY01_GRID, XY10_GRID, XY11_GRID],
 ]
+B0 = np.array([1.0, 1.5, 1.5, 2.0])
+B1 = np.ones(10)
+B2 = np.array([9.0, 8.0, 10.0, 12.0])
+B3 = np.array([1.0, 1.5, np.nan])
+B4 = np.array([1.0, 1.5, np.inf])
+NON_MONOTONIC_CELLS_1D = [
+    B0, tuple(B0), list(B0),
+    B1, tuple(B1), list(B1),
+    B2, tuple(B2), list(B2),
+    [X0_EDGES, B0],
+    [X0_EDGES, B1],
+    [X0_EDGES, B2],
+]
+NON_MONOTONIC_CELLS_2D = [
+    (X_EDGES, B0), (tuple(X_EDGES), tuple(B0)), (list(X_EDGES), list(B0)),
+    (X_EDGES, B1),
+    (X_EDGES, B2),
+    np.stack(np.meshgrid(X_EDGES, B0, indexing='ij'), axis=-1),
+    np.stack(np.meshgrid(X_EDGES, B1, indexing='ij'), axis=-1),
+    np.stack(np.meshgrid(X_EDGES, B2, indexing='ij'), axis=-1),
+    [(B0, Y0_EDGES), (B0, Y1_EDGES)],
+    [(tuple(B0), tuple(Y0_EDGES)), (tuple(B0), tuple(Y1_EDGES))],
+    [(list(B0), list(Y0_EDGES)), (list(B0), list(Y1_EDGES))],
+    [(B1, Y0_EDGES), (B1, Y1_EDGES)],
+    [(B2, Y0_EDGES), (B2, Y1_EDGES)],
+    [np.stack(np.meshgrid(B0, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B0, Y1_EDGES, indexing='ij'), axis=-1)],
+    [np.stack(np.meshgrid(B1, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B1, Y1_EDGES, indexing='ij'), axis=-1)],
+    [np.stack(np.meshgrid(B2, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B2, Y1_EDGES, indexing='ij'), axis=-1)],
+]
+NON_FINITE_CELLS_1D = [
+    B3, tuple(B3), list(B3),
+    B4, tuple(B4), list(B4),
+    [X0_EDGES, B3],
+    [X0_EDGES, B4],
+]
+NON_FINITE_CELLS_2D = [
+    (X_EDGES, B3), (tuple(X_EDGES), tuple(B3)), (list(X_EDGES), list(B3)),
+    (X_EDGES, B4),
+    np.stack(np.meshgrid(X_EDGES, B3, indexing='ij'), axis=-1),
+    np.stack(np.meshgrid(X_EDGES, B4, indexing='ij'), axis=-1),
+    [(B3, Y0_EDGES), (B3, Y1_EDGES)],
+    [(tuple(B3), tuple(Y0_EDGES)), (tuple(B3), tuple(Y1_EDGES))],
+    [(list(B3), list(Y0_EDGES)), (list(B3), list(Y1_EDGES))],
+    [(B4, Y0_EDGES), (B4, Y1_EDGES)],
+    [np.stack(np.meshgrid(B3, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B3, Y1_EDGES, indexing='ij'), axis=-1)],
+    [np.stack(np.meshgrid(B4, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B4, Y1_EDGES, indexing='ij'), axis=-1)],
+]
+OVERLAPPING_CELLS_2D = [
+    [(np.array([1.9, 2.4, 2.9]), Y0_EDGES), (np.array([1.0, 1.5, 2.0]), Y0_EDGES)],
+    [
+        np.stack(np.meshgrid(np.array([1.9, 2.4, 2.9]), Y0_EDGES, indexing='ij'), axis=-1),
+        np.stack(np.meshgrid(np.array([1.0, 1.5, 2.0]), Y0_EDGES, indexing='ij'), axis=-1)
+    ],
+]
+MISMATCHED_CELLS_2D = [
+    [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]))],
+    [XY00_GRID, np.stack(np.meshgrid(X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]), indexing='ij'), axis=-1)]
+]
+BAD_PRECONSTRUCTED_GRIDS = [
+    np.dstack((XY_GRID, XY_GRID)),
+    [np.dstack((XY00_GRID, XY00_GRID)), np.dstack((XY11_GRID, XY11_GRID))]
+]
+NONSENSICAL_CELLS = [
+    1, np.random.default_rng(42),
+    [[X0_EDGES, Y0_EDGES], [X0_EDGES, Y1_EDGES]],
+    ((X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES)),
+]
 
 
 def neg_pdf_1D(x):
@@ -52,13 +114,105 @@ def neg_pdf_2D(x):
     return -dist.pdf(x)
 
 
-## INPUT CHECKING ##############################################################
+def nonfinite_1D_pdf_vec(x):
+    f = np.ones_like(x)
+    f[x < 0] = np.nan
+    return f
+
+def nonfinite_1D_pdf_nonvec(x):
+    if x < 0:
+        return np.nan
+    else:
+        return 1.0
+
+def nonfinite_kD_pdf_vec(x):
+    f = np.ones((x.shape[:-1]))
+    f[x[..., 0] < 0] = np.nan
+    return f
+
+def nonfinite_kD_pdf_nonvec(x):
+    if x[0] < 0:
+        return np.nan
+    else:
+        return 1.0
+
+
+## INPUT CHECKING: DENSITY FN. #################################################
+
+
+@pytest.mark.parametrize("pdf,cells", [
+        (neg_pdf_1D, X_EDGES),
+        (neg_pdf_2D, (X_EDGES, Y_EDGES)),
+])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+def test_f_negative(pdf, cells, vectorizedpdf):
+    """Test error raised if f negative anywhere"""
+    with pytest.raises(ValueError):
+        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
+
+
+@pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
+        (nonfinite_1D_pdf_nonvec, X_EDGES, False),
+        (nonfinite_1D_pdf_vec, X_EDGES, True),
+        (nonfinite_kD_pdf_nonvec, (X_EDGES, Y_EDGES), False),
+        (nonfinite_kD_pdf_vec, (X_EDGES, Y_EDGES), True),
+])
+def test_f_nonfinite(pdf, cells, vectorizedpdf):
+    """Test error raised if f non-finite anywhere"""
+    with pytest.raises(ValueError):
+        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
+
+
+@pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
+        (lambda x: np.ones(10), X_EDGES, False),
+        (lambda x: 1.0, X_EDGES, True),
+        (lambda x: np.ones(len(x), 2), X_EDGES, True),
+        (lambda x: np.ones(2), (X_EDGES, Y_EDGES), False),
+        (lambda x: 1.0, (X_EDGES, Y_EDGES), True),
+        (lambda x: np.ones(len(x), 2), (X_EDGES, Y_EDGES), True),
+])
+def test_f_bad_shape(pdf, cells, vectorizedpdf):
+    """Test error raised if f returns inappropriate shape"""
+    with pytest.raises(ValueError):
+        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
+
+
+@pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
+        (lambda x: np.ones(10), X_EDGES, False),
+        (lambda x: 1.0, X_EDGES, True),
+        (lambda x: np.ones(len(x), 2), X_EDGES, True),
+        (lambda x: np.ones(2), (X_EDGES, Y_EDGES), False),
+        (lambda x: 1.0, (X_EDGES, Y_EDGES), True),
+        (lambda x: np.ones(len(x), 2), (X_EDGES, Y_EDGES), True),
+])
+def test_f_bad_shape(pdf, cells, vectorizedpdf):
+    """Test error raised if f returns inappropriate shape"""
+    with pytest.raises(ValueError):
+        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
+
+
+@pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
+        (lambda x: 3, X_EDGES, False),
+        (lambda x: np.ones_like(x, dtype=np.int32), X_EDGES, True),
+        (lambda x: 3, (X_EDGES, Y_EDGES), False),
+        (lambda x: np.ones(x.shape[:-1], dtype=np.int32), (X_EDGES, Y_EDGES), True),
+])
+def test_f_bad_type(pdf, cells, vectorizedpdf):
+    """Test error raised if f returns inappropriate type"""
+    with pytest.raises(TypeError):
+        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
+
+
+## INPUT CHECKING: SEED ########################################################
 
 
 def test_bad_seed():
     """Test that providing a nonsensical 'seed' raises an error."""
     with pytest.raises(TypeError):
-        LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, seed=42.5).sample()
+        LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, seed=42.5)
+
+
+## INPUT CHECKING: N_SAMPLES ###################################################
 
 
 def test_nonint_N_samples():
@@ -76,46 +230,6 @@ def test_bad_N_samples(N_samples):
         sampler.sample(N_samples=N_samples)
 
 
-@pytest.mark.parametrize("cells", CELLS_1D)
-def test_1D_f_negative(cells):
-    """Test error raised if f negative anywhere"""
-    sampler = LintSampler(neg_pdf_1D, cells, vectorizedpdf=True, seed=42)
-    with pytest.raises(ValueError):
-        sampler.sample()
-
-
-@pytest.mark.parametrize("cells", CELLS_2D)
-def test_kD_f_negative(cells):
-    """Test error raised if f negative anywhere"""
-    sampler = LintSampler(neg_pdf_2D, cells, vectorizedpdf=True, seed=42)
-    with pytest.raises(ValueError):
-        sampler.sample()
-
-
-@pytest.mark.parametrize("cells", BAD_CELLS)
-def test_1D_edges_non_monotonic(cells):
-    """Test error raised if 1D edges not monotonic"""
-    sampler = LintSampler(norm.pdf, cells, vectorizedpdf=True, seed=42)
-    with pytest.raises(ValueError):
-        sampler.sample()
-
-
-@pytest.mark.parametrize("qmc_engine", [Sobol(d=1, scramble=True, seed=42), Halton(d=1, seed=42), Sobol(d=3, scramble=True, seed=42), Halton(d=3, seed=42)])
-def test_wrong_qmc_dimension(qmc_engine):
-    """Test error raised if dimension of user-provided QMC engine is wrong."""
-    with pytest.raises(ValueError):
-        sampler = LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
-        sampler.sample()
-
-
-@pytest.mark.parametrize("qmc_engine", [123.45, np.random.default_rng()])
-def test_wrong_qmc(qmc_engine):
-    """Test error raised if user-provided QMC engine is not scipy QMC engine."""
-    with pytest.raises(TypeError):
-        sampler = LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
-        sampler.sample()
-
-
 def test_non_power2_sobol_warning():
     """Test warning raised if using Sobol sampler with non-power of 2."""
     with pytest.warns(UserWarning):
@@ -123,20 +237,111 @@ def test_non_power2_sobol_warning():
         sampler.sample(N_samples=10)
 
 
+## INPUT CHECKING: CELLS #######################################################
+
+@pytest.mark.parametrize("cells", NON_MONOTONIC_CELLS_1D)
+def test_1D_edges_non_monotonic(cells):
+    """Test error raised if 1D edges not monotonic"""
+    with pytest.raises(ValueError):
+        LintSampler(norm.pdf, cells)
+
+
+@pytest.mark.parametrize("cells", NON_MONOTONIC_CELLS_2D)
+def test_kD_edges_non_monotonic(cells):
+    """Test error raised if 2D edges not monotonic"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    with pytest.raises(ValueError):
+        LintSampler(dist.pdf, cells)
+
+
+@pytest.mark.parametrize("cells", NON_FINITE_CELLS_1D)
+def test_1D_edges_non_finite(cells):
+    """Test error raised if 1D cells contain non-finite values (NaN/inf etc)"""
+    with pytest.raises(ValueError):
+        LintSampler(norm.pdf, cells)
+
+
+@pytest.mark.parametrize("cells", NON_FINITE_CELLS_2D)
+def test_kD_edges_non_finite(cells):
+    """Test error raised if 2D cells contain non-finite values (NaN/inf etc)"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    with pytest.raises(ValueError):
+        LintSampler(dist.pdf, cells)
+
+
+def test_1D_edges_overlapping():
+    """Test error raised if distinct 1D grids are overlapping"""
+    cells = [np.array([1.9, 2.4, 2.9]), np.array([1.0, 1.5, 2.0])]
+    with pytest.raises(ValueError):
+        LintSampler(norm.pdf, cells)
+
+
+@pytest.mark.parametrize("cells", OVERLAPPING_CELLS_2D)
+def test_kD_edges_overlapping(cells):
+    """Test error raised if distinct kD grids are overlapping"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    with pytest.raises(ValueError):
+        LintSampler(dist.pdf, cells)
+
+
+@pytest.mark.parametrize("cells", MISMATCHED_CELLS_2D)
+def test_kD_mismatched_dims(cells):
+    """Test error raised if distinct kD grids have mismatched dimensions"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    with pytest.raises(ValueError):
+        LintSampler(dist.pdf, cells)
+
+
+@pytest.mark.parametrize("cells", BAD_PRECONSTRUCTED_GRIDS)
+def test_preconstructed_grid_bad_shape(cells):
+    """Test error raised if pre-constructed grid has nonsensical shape"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    with pytest.raises(ValueError):
+        LintSampler(dist.pdf, cells)
+
+
+@pytest.mark.parametrize("cells", NONSENSICAL_CELLS)
+def test_nonsensical_cells(cells):
+    """Test error raised if cells are nonsensical types"""
+    with pytest.raises(TypeError):
+        LintSampler(norm.pdf, cells)
+
+
+## INPUT CHECKING: QMC #########################################################
+
+@pytest.mark.parametrize("qmc_engine",
+    [
+        Sobol(d=1, scramble=True, seed=42),
+        Halton(d=1, seed=42),
+        Sobol(d=3, scramble=True, seed=42),
+        Halton(d=3, seed=42)
+    ]
+)
+def test_wrong_qmc_dimension(qmc_engine):
+    """Test error raised if dimension of user-provided QMC engine is wrong."""
+    with pytest.raises(ValueError):
+        LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
+
+
+@pytest.mark.parametrize("qmc_engine", [123.45, np.random.default_rng()])
+def test_wrong_qmc(qmc_engine):
+    """Test error raised if user-provided QMC engine is not scipy QMC engine."""
+    with pytest.raises(TypeError):
+        LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
+
+
 def test_qmc_flag_engine_warning():
     """Test warning raised if user-provided qmc engine while qmc flag False"""
     engine = Sobol(d=2, scramble=True, seed=42)
     with pytest.warns(UserWarning):
-        sampler = LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=False, qmc_engine=engine)
-        sampler.sample()
+        LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=False, qmc_engine=engine)
 
 
 def test_qmc_seed_warning():
     """Test warning raised if user-provided qmc engine while seed also given"""
     engine = Sobol(d=2, scramble=True, seed=42)
     with pytest.warns(UserWarning):
-        sampler = LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=engine, seed=42)
-        sampler.sample()
+        LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=engine, seed=42)
 
 
 ## OUTPUT SHAPES ###############################################################

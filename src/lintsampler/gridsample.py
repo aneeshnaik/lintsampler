@@ -120,8 +120,6 @@ def _gridsample(
                 "Length of edge array doesn't match corresponding "
                 "density grid dimension."
             )
-        if np.any(np.diff(a) <= 0):
-            raise ValueError("Edge array not monotically increasing.")
             
     # check densities positive everywhere
     if np.any(f < 0):

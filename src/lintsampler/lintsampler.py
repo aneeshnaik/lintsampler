@@ -439,7 +439,6 @@ class LintSampler:
             self.edgearrays = [np.array(cells)]
             self.edgedims = (len(cells),)
 
-
         # 1. tuples defining the array -> make arrays, pass to gridsample
         # i.e. cells = (np.linspace(-12,12,100),np.linspace(-4,4,50))
         elif isinstance(cells,tuple):
@@ -557,6 +556,13 @@ class LintSampler:
             self.x0 = np.vstack([grids[ngrid][tuple([slice(0,self.gridshape[ngrid][griddim]-1) for griddim in range(0,self.dim)])].reshape((self.nedgegridentries[ngrid],self.dim)) for ngrid in range(0,self.ngrids)])
             self.x1 = np.vstack([grids[ngrid][tuple([slice(1,self.gridshape[ngrid][griddim]  ) for griddim in range(0,self.dim)])].reshape((self.nedgegridentries[ngrid],self.dim)) for ngrid in range(0,self.ngrids)])
 
+        # if gridsample, check that edge arrays are good-valued and monotonic
+        if self.eval_type == 'gridsample':
+            for a in self.edgearrays:
+                if np.any(np.diff(a) <= 0):
+                    raise ValueError("LintSampler._setgrid: Edge array not monotically increasing.")
+                if not np.isfinite(a).all():
+                    raise ValueError("LintSampler._setgrid: Edge array not finite-valued")
 
     def _get_startend_points(self):
         """Return all combinations of start and end points for offset grids.
