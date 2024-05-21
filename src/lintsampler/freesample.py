@@ -2,13 +2,11 @@ import numpy as np
 import warnings
 from math import log2
 from .unitsample_kd import _unitsample_kd
-from .utils import _check_N_samples, _generate_usamples, _choice
+from .utils import _choice
 
 
-def _freesample(
-    x0, x1, *f, N_samples=None, seed=None,
-    qmc=False, qmc_engine=None
-):
+def _freesample(x0, x1, *f, u):
+    # TODO update docstring
     """Draw sample(s) from k-D hyperbox(es) with known vertex densities.
 
     Given a k-dimensional hyperbox (or a set of such boxes) with densities known
@@ -147,15 +145,7 @@ def _freesample(
     This returns a 2D array, shape ``N_samples`` x k. This represents the
     ``N_samples`` sampling points, drawn from across the k-D sampling space
     spanned by the series of specified cells.
-    """
-    # check requested no. samples is None or positive int
-    _check_N_samples(N_samples)
-    
-    # check densities positive everywhere
-    for fi in f:
-        if np.any(fi < 0):
-            raise ValueError("Densities can't be negative")
-    
+    """    
     # if x0/x1 scalar (1D coords) then promote to single-element 1D array
     if not hasattr(x0, "__len__"):
         x0 = np.array([x0])
@@ -183,10 +173,10 @@ def _freesample(
     
     # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
     # first k dims used for lintsampling, last dim used for cell choice
-    if N_samples:
-        u = _generate_usamples(N_samples, k + 1, seed, qmc, qmc_engine)
-    else:
-        u = _generate_usamples(1, k + 1, seed, qmc, qmc_engine)
+    # if N_samples:
+    #     u = _generate_usamples(N_samples, k + 1, seed, qmc, qmc_engine)
+    # else:
+    #     u = _generate_usamples(1, k + 1, seed, qmc, qmc_engine)
 
     # choose cell(s)
     c = _cell_choice(x0, x1, *f, u=u[:, -1])
@@ -200,12 +190,12 @@ def _freesample(
     z = x0 + (x1 - x0) * _unitsample_kd(*f, u=u[:, :-1])
 
     # squeeze down to scalar / 1D if appropriate
-    if not N_samples and (k == 1):
-        z = z.item()
-    elif not N_samples:
-        z = z[0]
-    elif (k == 1):
-        z = z[:, 0]
+    #if not N_samples and (k == 1):
+    #    z = z.item()
+    #elif not N_samples:
+    #    z = z[0]
+    #elif (k == 1):
+    #    z = z[:, 0]
 
     return z
     

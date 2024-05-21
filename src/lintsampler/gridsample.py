@@ -2,12 +2,11 @@ import numpy as np
 import warnings
 from functools import reduce
 from .unitsample_kd import _unitsample_kd
-from .utils import _check_N_samples, _generate_usamples, _choice
+from .utils import _choice
 
 
-def _gridsample(
-    *edgearrays, f, N_samples=None, seed=None, qmc=False, qmc_engine=None
-):
+def _gridsample(*edgearrays, f, u):
+    # TODO: update docstring (u has shape (Nsamples, k+1), inc (1, k+1))
     """Draw sample(s) from density function defined on k-D grid.
     
     Given a k-dimensional grid shaped :math:`(N_0, N_1, ..., N_{k-1})`, the user
@@ -108,9 +107,6 @@ def _gridsample(
     This returns a 2D array, shape ``N_samples`` x k: the ``N_samples`` k-D
     samples within the grid.
     """
-    # check requested no. samples is None or positive int
-    _check_N_samples(N_samples)
-
     # check edge arrs 1D, mono. increasing, and match corresponding f dim
     for i, a in enumerate(edgearrays):
         if a.ndim != 1:
@@ -129,17 +125,17 @@ def _gridsample(
     if f.shape != tuple(len(a) for a in edgearrays):
         raise ValueError("Shape of densities doesn't match edge array lengths.")
 
-    # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
-    # first k dims used for lintsampling, last dim used for cell choice
-    if N_samples:
-        u = _generate_usamples(N_samples, f.ndim + 1, seed, qmc, qmc_engine)
-    else:
-        u = _generate_usamples(1, f.ndim + 1, seed, qmc, qmc_engine)
+    # # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
+    # # first k dims used for lintsampling, last dim used for cell choice
+    # if N_samples:
+    #     u = _generate_usamples(N_samples, f.ndim + 1, seed, qmc, qmc_engine)
+    # else:
+    #     u = _generate_usamples(1, f.ndim + 1, seed, qmc, qmc_engine)
 
     # randomly choose grid cell(s)
     cells = _gridcell_choice(*edgearrays, f=f, u=u[..., -1])
-    if not N_samples:
-        cells = cells[0]
+    #if not N_samples:
+    #    cells = cells[0]
 
     # get 2^k-tuple of densities at cell corners
     corners = _gridcell_corners(f, cells)
@@ -150,18 +146,20 @@ def _gridsample(
     # rescale coordinates (loop over dimensions)
     for d in range(f.ndim):
         e = edgearrays[d]
-        if N_samples:
-            c = cells[:, d]
-            z[:, d] = e[c] + np.diff(e)[c] * z[:, d]
-        else:
-            c = cells[d]
-            z[d] = e[c] + np.diff(e)[c] * z[d]
+        #if N_samples:
+        print(corners)
+        print(e.shape, cells.shape, z.shape, u.shape)
+        c = cells[:, d]
+        z[:, d] = e[c] + np.diff(e)[c] * z[:, d]
+        #else:
+        #    c = cells[d]
+        #    z[d] = e[c] + np.diff(e)[c] * z[d]
 
-    # squeeze down to scalar / 1D if appropriate
-    if not N_samples and (f.ndim == 1):
-        z = z.item()
-    elif (f.ndim == 1):
-        z = z[:, 0]
+    # # squeeze down to scalar / 1D if appropriate
+    # if not N_samples and (f.ndim == 1):
+    #     z = z.item()
+    # elif (f.ndim == 1):
+    #     z = z[:, 0]
 
     return z
 

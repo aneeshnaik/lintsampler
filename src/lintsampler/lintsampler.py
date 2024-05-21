@@ -1,7 +1,9 @@
 import numpy as np
 import warnings
+from scipy.stats.qmc import QMCEngine, Sobol
 from .gridsample import _gridsample
 from .freesample import _freesample
+from .utils import _check_N_samples
 
 class LintSampler:
     """Draw sample(s) from density function defined for a list of cells (that may or may not be in a single grid)
@@ -111,27 +113,32 @@ class LintSampler:
         Attributes
         ----------
         pdf : function
-        seed : None, int, or ``numpy`` random Generator
         vectorizedpdf : boolean
 
         """
 
         # set args as attributes
         self.pdf = pdf
-        self.seed = seed
         self.vectorizedpdf = vectorizedpdf
-
-        # configure QMC according to given parameters
-        self._setqmc(qmc, qmc_engine)
 
         # set up the sampling grid under the hood
         self._setgrid(cells)
+        
+        # configure random state according to given random seed and QMC params
+        self._set_random_state(seed, qmc, qmc_engine)
     
-    def _setqmc(self, qmc, qmc_engine):
+    def _set_random_state(self, seed, qmc, qmc_engine):
         """Parse QMC-related parameters and set as attributes.
         
         Parameters
         ----------
+        
+        seed : {None, int, ``numpy.random.Generator``}, optional
+            Seed for ``numpy`` random generator. Can be random generator itself,
+            in which case it is left unchanged. Can also be the seed to a
+            default generator. Default is None, in which case new default
+            generator is created. See ``numpy`` random generator docs for more
+            information.
 
         qmc : bool, optional
             Whether to use Quasi-Monte Carlo sampling. Default is False.
@@ -151,27 +158,61 @@ class LintSampler:
         Attributes
         ----------
         qmc : boolean
-        qmc_engine : None or ``scipy`` QMCEngine
+        qmc_engine : None or ``scipy`` QMCEngine, used if qmc is True
+        rng : ``numpy`` random generator, used if qmc is False
 
         """
-        # warn if qmc engine provided but qmc off
-        if not qmc and qmc_engine is not None:
-            warnings.warn(
-                "LintSampler.__init__: " \
-                "provided qmc_engine won't be used as qmc switched off."
-            )
-    
-        # warn if qmc engine provided and RNG seed provided
-        if qmc_engine is not None and self.seed is not None:
-            warnings.warn(
-                "LintSampler.__init__: " \
-                "provided random seed won't be used as qmc_engine provided."
-            )
-        
-        # store qmc flag and engine as attributes
         self.qmc = qmc
-        self.qmc_engine = qmc_engine
-        return
+        
+        # if using quasi-MC, configure qmc engine, else use numpy RNG
+        if self.qmc:
+            
+            # default: scrambled Sobol
+            if qmc_engine is None:
+                qmc_engine = Sobol(d=self.dim + 1, bits=32, seed=seed)
+            
+            # user-provided QMC engine
+            elif isinstance(qmc_engine, QMCEngine):
+                
+                # check dimension appropriate
+                if qmc_engine.d != self.dim + 1:
+                    raise ValueError(
+                        "LintSampler.__init__: " \
+                        f"qmc_engine inconsistent: expected {self.dim + 1}."
+                    )
+                
+                # warn if qmc engine provided and RNG seed provided
+                if seed is not None:
+                    warnings.warn(
+                        "LintSampler.__init__: " \
+                        "provided random seed won't be used as qmc_engine provided."
+                    )
+
+            # QMC engine type not recognized
+            else:
+                raise TypeError("qmc_engine must be QMCEngine instance or None")
+
+            # store attribute
+            self.qmc_engine = qmc_engine
+        else:
+            
+            # set up numpy RNG
+            self.rng = np.random.default_rng(seed)
+        
+            # if qmc engine provided but QMC flag off, warn
+            if qmc_engine is not None:
+                warnings.warn(
+                    "LintSampler.__init__: " \
+                    "provided qmc_engine won't be used as qmc switched off."
+                )
+
+    def _generate_usamples(self, N):
+        """Generate uniform samples (N x dim + 1), either with RNG or QMC engine."""
+        if self.qmc:
+            u = self.qmc_engine.random(N)
+        else:
+            u = self.rng.random((N, self.dim + 1))
+        return u        
 
     def _evaluate_gridded_pdf(self,funcargs=()):
         """Evaluate the pdf on a grid, handling the flag for vectorized.
@@ -288,23 +329,27 @@ class LintSampler:
             N_samples is None) in 1D. 1D array if single sample in k-D OR multiple
             samples in 1D. 2D array if multiple samples in k-D.
         
-        
         """
+        _check_N_samples(N_samples)
+
+        # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
+        # first k dims used for lintsampling, last dim used for cell choice
+        if N_samples:
+            u = self._generate_usamples(N_samples)
+        else:
+            u = self._generate_usamples(1)
         
         # check that the function can be evaluated at the passed-in points (i.e. needs to take the dimensions as an argument)
-
         if self.eval_type == 'gridsample':
 
             # evaluate the pdf
             evalf = self._evaluate_gridded_pdf(funcargs)
 
             # call the gridded sampler
-            X = _gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.seed,qmc=self.qmc,qmc_engine=self.qmc_engine)
+            X = _gridsample(*self.edgearrays, f=evalf, u=u)
 
-            return X
-
-
-        elif self.eval_type == 'freesample':
+        else:
+            assert self.eval_type == 'freesample'
 
             if self.dim == 1:
 
@@ -348,16 +393,17 @@ class LintSampler:
 
 
             # do the sampling
-            X = _freesample(self.x0,self.x1,*corners,N_samples=N_samples,seed=self.seed,qmc=self.qmc,qmc_engine=self.qmc_engine)
+            X = _freesample(self.x0,self.x1,*corners,u=u)
 
-            return X
+        # squeeze down to scalar / 1D if appropriate
+        if not N_samples and (self.dim == 1):
+            X = X.item()
+        elif not N_samples:
+            X = X[0]
+        elif (self.dim == 1):
+            X = X[:, 0]
 
-
-        else:
-            raise ValueError(f"LintSampler.sample: eval_type is expected to be either gridsample or freesample.")
-
-        pass
-
+        return X
 
     def resetgrid(self,cells=()):
         """Reset the sample grid without changing the pdf.
