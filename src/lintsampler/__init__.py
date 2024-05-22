@@ -1,9 +1,15 @@
+"""
+lintsampler
+
+Efficient random sampling via linear interpolation.
+
+See README file and online documentation (https://lintsampler.readthedocs.io)
+for further details and usage instructions. 
+"""
 from .lintsampler import LintSampler
+from .grid import Grid
 from importlib.metadata import version, PackageNotFoundError
 
-#try:
 __version__ = version("lintsampler")
-#except PackageNotFoundError:
-#    __version__ = "unknown version"
 
-__all__ = ["LintSampler"]
+__all__ = ["LintSampler, Grid"]
