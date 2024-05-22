@@ -1,7 +1,7 @@
 import numpy as np
 import warnings
 from scipy.stats.qmc import QMCEngine, Sobol
-from .grid import Grid
+from .grid import SamplingGrid
 from .utils import _check_N_samples, _is_1D_iterable, _choice, _check_hyperbox_overlap
 from .sampling import _grid_sample
 
@@ -360,10 +360,10 @@ class LintSampler:
         }
         if isinstance(cells, list) and not _is_1D_iterable(cells):
             self.ngrids = len(cells)
-            self.grids = [Grid(cells=ci, **gargs) for ci in cells]
+            self.grids = [SamplingGrid(cells=ci, **gargs) for ci in cells]
         else:
             self.ngrids = 1
-            self.grids = [Grid(cells=cells, **gargs)]
+            self.grids = [SamplingGrid(cells=cells, **gargs)]
         self.dim = self.grids[0].dim
     
         # loop over grid pairs and check no overlap
@@ -380,112 +380,3 @@ class LintSampler:
                     )
 
         # TODO: test if grids have different dim
-        
-        # # 2. a list of tuples defining multiple arrays
-        # # i.e. cells = [(np.linspace(-12,0,100),np.linspace(-4,0,50)),(np.linspace(0,12,100),np.linspace(0,4,50))]
-        # # or in 1d case, a list of un-linked grids
-        # # i.e. cells = [np.linspace(-12,0,100),np.linspace(2,12,100)]
-        # # or a list of grids that have been preconstructed and stacked,
-        # # i.e. [np.stack(np.meshgrid(np.linspace(-12,0,100),np.linspace(-4,0,50), indexing='ij'), axis=-1),np.stack(np.meshgrid(np.linspace(0,12,100),np.linspace(0,4,50), indexing='ij'), axis=-1)]
-        # elif isinstance(cells,list):
-        #     self.eval_type = 'freesample'
-
-        #     # variable controlling whether grids have already been constructed or not
-        #     _gridsconstructed = False
-
-        #     # how many grid boundaries are we being handed?
-        #     self.ngrids = len(cells)
-
-        #     # infer dimensionality
-        #     # cells = list of tuples of 1D iterables
-        #     if isinstance(cells[0], tuple) and hasattr(cells[0][0], "__len__"):
-        #         self.dim = len(cells[0])
-        #     # cells = list of (k+1)-d grids (i.e. preconstructed k-d grids)
-        #     elif isinstance(cells[0], np.ndarray) and cells[0].ndim > 1:
-        #         _gridsconstructed = True
-        #         self.dim = cells[0].shape[-1]
-        #     # cells = list of 1d iterables
-        #     elif hasattr(cells[0], "__len__") and not hasattr(cells[0][0], "__len__"):
-        #         self.dim = 1
-        #     else:
-        #         raise ValueError(f"LintSampler._setgrid: Input cells do not make sense.")
-
-        #     # create holding arrays
-        #     grids                 = [] # the grids constructed from the inputs (no need to expose)
-        #     self.gridshape        = [] # the shape of the input grids
-        #     self.ngridentries     = [] # the number of entries in the grid
-        #     self.nedgegridentries = [] # the number of entries in the edge grid
-        #     self.edgearrays       = [] # the flattened grids, each [ngridentries,dim]
-
-        #     # loop through the boundaries, construct the grids, and flatten
-        #     for ngrid in range(0,self.ngrids):
-               
-        #         if _gridsconstructed:
-        #             # check that the grid has the same dimensionality as the others
-        #             if ((self.dim>1) & (cells[ngrid].shape[-1]!=self.dim)):
-        #                 raise ValueError(f"LintSampler._setgrid: All input grids must have the same dimensionality.")
-                    
-        #             grid = cells[ngrid]
-
-        #         else:
-        #             # check that the dimensions are properly specified for the grid
-        #             if self.dim > 1 and len(cells[ngrid])!=self.dim:
-        #                 raise ValueError(f"LintSampler._setgrid: All input cells must have the same dimensionality.")
-
-        #             # construct the grid
-        #             if self.dim > 1:
-        #                 grid = np.stack(np.meshgrid(*cells[ngrid], indexing='ij'), axis=-1)
-        #             else:
-        #                 grid = np.array(cells[ngrid])
-
-        #         # save the grid
-        #         grids.append(grid)
-
-        #         # construct the grid boundary helpers
-        #         self.gridshape.append(grid.shape)
-        #         self.ngridentries.append(np.prod(grid.shape[0:self.dim]))
-        #         self.nedgegridentries.append(np.prod(np.array(grid.shape[0:self.dim])-1))
-
-        #         # flatten the grid into a [...,dim] array for passing to pdf
-        #         self.edgearrays.append(grid.reshape(self.ngridentries[ngrid],self.dim))
-            
-        #     self.x0 = np.vstack([grids[ngrid][tuple([slice(0,self.gridshape[ngrid][griddim]-1) for griddim in range(0,self.dim)])].reshape((self.nedgegridentries[ngrid],self.dim)) for ngrid in range(0,self.ngrids)])
-        #     self.x1 = np.vstack([grids[ngrid][tuple([slice(1,self.gridshape[ngrid][griddim]  ) for griddim in range(0,self.dim)])].reshape((self.nedgegridentries[ngrid],self.dim)) for ngrid in range(0,self.ngrids)])
-
-        # # if gridsample, check that edge arrays are good-valued and monotonic
-        # if self.eval_type == 'gridsample':
-        #     for a in self.edgearrays:
-        #         if np.any(np.diff(a) <= 0):
-        #             raise ValueError("LintSampler._setgrid: Edge array not monotically increasing.")
-        #         if not np.isfinite(a).all():
-        #             raise ValueError("LintSampler._setgrid: Edge array not finite-valued")
-
-    # def _get_startend_points(self):
-    #     """Return all combinations of start and end points for offset grids.
-        
-    #     Parameters
-    #     ----------
-    #     self : LintSampler
-    #         The LintSampler instance.
-
-    #     Returns
-    #     -------
-    #     combinations: numpy array
-    #         All possible combinations of starting and ending points for the
-    #         inferred dimensionality of the problem.
-        
-    #     """
-
-    #     # Create an array representing the start/end points
-    #     arr = np.array([0, 1]) 
-
-    #     # get all combinations
-    #     combinations = np.array(np.meshgrid(*[arr]*self.dim)).T.reshape(-1,self.dim)
-
-    #     # Rearrange the combinations
-    #     sorted_combinations = np.lexsort(combinations.T[::-1])
-
-    #     # Reorder the combinations
-    #     combinations = combinations[sorted_combinations]
-
-    #     return combinations

@@ -1,5 +1,6 @@
-# TODO: test reset grid
 # TODO: input premade Grid instance
+# TODO: Grid test suite
+# TODO: test example of single-cell grid(s)
 
 import pytest
 import numpy as np

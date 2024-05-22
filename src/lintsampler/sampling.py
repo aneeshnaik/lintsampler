@@ -105,19 +105,13 @@ def _unitsample_kd(*f, u):
 
 def _grid_sample(grid, u):
     # TODO: docstring
+    # TODO: special case of grid with single cell
     
-    # get flattened array of grid cell probabilities
-    m_norm = grid.masses / grid.masses.sum()
-    p = m_norm.flatten()
-
-    # choose cells (array of flattened indices)
-    cells = _choice(p=p, u=u[..., -1])
-
-    # unravel 1D cell indices into k-D grid indices
-    cells = np.stack(np.unravel_index(cells, m_norm.shape), axis=-1)
+    # get indices of grid cells: 2D array (N, k)
+    cells = grid.choose(u[..., -1])
 
     # get 2^k-tuple of densities at cell corners
-    corners = grid.corners(cells)
+    corners = grid.get_cell_corner_densities(cells)
 
     # sample on unit hypercube
     z = _unitsample_kd(*corners, u=u[..., :-1])
