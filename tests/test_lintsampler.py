@@ -5,9 +5,6 @@ import pytest
 import numpy as np
 from scipy.stats import norm, multivariate_normal
 from scipy.stats.qmc import Sobol, Halton
-import sys
-import os
-sys.path.insert(0, os.path.abspath("src"))
 from lintsampler import LintSampler
 
 X_EDGES = np.linspace(-10, 10, 65)
