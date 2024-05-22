@@ -5,6 +5,7 @@ from .unitsample_1d import _unitsample_1d
 
 
 def _unitsample_kd(*f, u):
+    # TODO: check docstring (not dealing with scalars anymore)
     """Batched sampling from linear interpolant in k-dimensional unit hypercube.
     
     f is either a series of 2^k scalars or 2^k 1D numpy arrays, each length N,
@@ -35,10 +36,6 @@ def _unitsample_kd(*f, u):
     # if densities scalar, cast into length-1 arrays
     if not hasattr(f[0], "__len__"):
         f = [np.array([fi]) for fi in f]
-    
-    # if uniform samples are 1d array (k,), reshape into (1, k)
-    if u.ndim == 1:
-        u = u[np.newaxis]
 
     # infer dimensionality and batch size
     k = int(log2(len(f)))

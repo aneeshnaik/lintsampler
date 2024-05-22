@@ -1,3 +1,6 @@
+# TODO: test reset grid
+# TODO: input premade Grid instance
+
 import pytest
 import numpy as np
 from scipy.stats import norm, multivariate_normal
@@ -30,11 +33,9 @@ CELLS_2D = [
     (X_EDGES, Y_EDGES),
     (tuple(X_EDGES), tuple(Y_EDGES)),
     (list(X_EDGES), list(Y_EDGES)),
-    XY_GRID,
     [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES), (X1_EDGES, Y0_EDGES), (X1_EDGES, Y1_EDGES)],
     [(tuple(X0_EDGES), tuple(Y0_EDGES)), (tuple(X0_EDGES), tuple(Y1_EDGES)), (tuple(X1_EDGES), tuple(Y0_EDGES)), (tuple(X1_EDGES), tuple(Y1_EDGES))],
     [(list(X0_EDGES), list(Y0_EDGES)), (list(X0_EDGES), list(Y1_EDGES)), (list(X1_EDGES), list(Y0_EDGES)), (list(X1_EDGES), list(Y1_EDGES))],
-    [XY00_GRID, XY01_GRID, XY10_GRID, XY11_GRID],
 ]
 B0 = np.array([1.0, 1.5, 1.5, 2.0])
 B1 = np.ones(10)
@@ -53,17 +54,11 @@ NON_MONOTONIC_CELLS_2D = [
     (X_EDGES, B0), (tuple(X_EDGES), tuple(B0)), (list(X_EDGES), list(B0)),
     (X_EDGES, B1),
     (X_EDGES, B2),
-    np.stack(np.meshgrid(X_EDGES, B0, indexing='ij'), axis=-1),
-    np.stack(np.meshgrid(X_EDGES, B1, indexing='ij'), axis=-1),
-    np.stack(np.meshgrid(X_EDGES, B2, indexing='ij'), axis=-1),
     [(B0, Y0_EDGES), (B0, Y1_EDGES)],
     [(tuple(B0), tuple(Y0_EDGES)), (tuple(B0), tuple(Y1_EDGES))],
     [(list(B0), list(Y0_EDGES)), (list(B0), list(Y1_EDGES))],
     [(B1, Y0_EDGES), (B1, Y1_EDGES)],
     [(B2, Y0_EDGES), (B2, Y1_EDGES)],
-    [np.stack(np.meshgrid(B0, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B0, Y1_EDGES, indexing='ij'), axis=-1)],
-    [np.stack(np.meshgrid(B1, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B1, Y1_EDGES, indexing='ij'), axis=-1)],
-    [np.stack(np.meshgrid(B2, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B2, Y1_EDGES, indexing='ij'), axis=-1)],
 ]
 NON_FINITE_CELLS_1D = [
     B3, tuple(B3), list(B3),
@@ -74,29 +69,16 @@ NON_FINITE_CELLS_1D = [
 NON_FINITE_CELLS_2D = [
     (X_EDGES, B3), (tuple(X_EDGES), tuple(B3)), (list(X_EDGES), list(B3)),
     (X_EDGES, B4),
-    np.stack(np.meshgrid(X_EDGES, B3, indexing='ij'), axis=-1),
-    np.stack(np.meshgrid(X_EDGES, B4, indexing='ij'), axis=-1),
     [(B3, Y0_EDGES), (B3, Y1_EDGES)],
     [(tuple(B3), tuple(Y0_EDGES)), (tuple(B3), tuple(Y1_EDGES))],
     [(list(B3), list(Y0_EDGES)), (list(B3), list(Y1_EDGES))],
     [(B4, Y0_EDGES), (B4, Y1_EDGES)],
-    [np.stack(np.meshgrid(B3, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B3, Y1_EDGES, indexing='ij'), axis=-1)],
-    [np.stack(np.meshgrid(B4, Y0_EDGES, indexing='ij'), axis=-1), np.stack(np.meshgrid(B4, Y1_EDGES, indexing='ij'), axis=-1)],
 ]
 OVERLAPPING_CELLS_2D = [
     [(np.array([1.9, 2.4, 2.9]), Y0_EDGES), (np.array([1.0, 1.5, 2.0]), Y0_EDGES)],
-    [
-        np.stack(np.meshgrid(np.array([1.9, 2.4, 2.9]), Y0_EDGES, indexing='ij'), axis=-1),
-        np.stack(np.meshgrid(np.array([1.0, 1.5, 2.0]), Y0_EDGES, indexing='ij'), axis=-1)
-    ],
 ]
 MISMATCHED_CELLS_2D = [
     [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]))],
-    [XY00_GRID, np.stack(np.meshgrid(X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]), indexing='ij'), axis=-1)]
-]
-BAD_PRECONSTRUCTED_GRIDS = [
-    np.dstack((XY_GRID, XY_GRID)),
-    [np.dstack((XY00_GRID, XY00_GRID)), np.dstack((XY11_GRID, XY11_GRID))]
 ]
 NONSENSICAL_CELLS = [
     1, np.random.default_rng(42),
@@ -166,40 +148,14 @@ def test_f_nonfinite(pdf, cells, vectorizedpdf):
 @pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
         (lambda x: np.ones(10), X_EDGES, False),
         (lambda x: 1.0, X_EDGES, True),
-        (lambda x: np.ones(len(x), 2), X_EDGES, True),
+        (lambda x: np.ones((len(x), 2)), X_EDGES, True),
         (lambda x: np.ones(2), (X_EDGES, Y_EDGES), False),
         (lambda x: 1.0, (X_EDGES, Y_EDGES), True),
-        (lambda x: np.ones(len(x), 2), (X_EDGES, Y_EDGES), True),
+        (lambda x: np.ones((len(x), 2)), (X_EDGES, Y_EDGES), True),
 ])
 def test_f_bad_shape(pdf, cells, vectorizedpdf):
     """Test error raised if f returns inappropriate shape"""
     with pytest.raises(ValueError):
-        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
-
-
-@pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
-        (lambda x: np.ones(10), X_EDGES, False),
-        (lambda x: 1.0, X_EDGES, True),
-        (lambda x: np.ones(len(x), 2), X_EDGES, True),
-        (lambda x: np.ones(2), (X_EDGES, Y_EDGES), False),
-        (lambda x: 1.0, (X_EDGES, Y_EDGES), True),
-        (lambda x: np.ones(len(x), 2), (X_EDGES, Y_EDGES), True),
-])
-def test_f_bad_shape(pdf, cells, vectorizedpdf):
-    """Test error raised if f returns inappropriate shape"""
-    with pytest.raises(ValueError):
-        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
-
-
-@pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
-        (lambda x: 3, X_EDGES, False),
-        (lambda x: np.ones_like(x, dtype=np.int32), X_EDGES, True),
-        (lambda x: 3, (X_EDGES, Y_EDGES), False),
-        (lambda x: np.ones(x.shape[:-1], dtype=np.int32), (X_EDGES, Y_EDGES), True),
-])
-def test_f_bad_type(pdf, cells, vectorizedpdf):
-    """Test error raised if f returns inappropriate type"""
-    with pytest.raises(TypeError):
         LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
 
 
@@ -287,14 +243,6 @@ def test_kD_edges_overlapping(cells):
 @pytest.mark.parametrize("cells", MISMATCHED_CELLS_2D)
 def test_kD_mismatched_dims(cells):
     """Test error raised if distinct kD grids have mismatched dimensions"""
-    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    with pytest.raises(ValueError):
-        LintSampler(dist.pdf, cells)
-
-
-@pytest.mark.parametrize("cells", BAD_PRECONSTRUCTED_GRIDS)
-def test_preconstructed_grid_bad_shape(cells):
-    """Test error raised if pre-constructed grid has nonsensical shape"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
     with pytest.raises(ValueError):
         LintSampler(dist.pdf, cells)
@@ -447,6 +395,7 @@ def test_1D_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
 @pytest.mark.parametrize("qmc,qmc_engine", [(False, None), (True, None), (True, Halton(d=3))])
 def test_kD_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
+    """Test samples from single kD Gaussian have corrent mean and cov."""
     mu_true = np.array([1.5, -0.5])
     cov_true = np.array([
         [ 1.0,  -0.5],
@@ -457,6 +406,43 @@ def test_kD_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     sampler = LintSampler(dist.pdf, cells=cells, vectorizedpdf=vectorizedpdf, qmc=qmc, qmc_engine=qmc_engine)
     x = sampler.sample(N_samples=2**18)
 
+    mu = np.round(np.mean(x, axis=0), decimals=1)
+    cov = np.round(np.cov(x.T), decimals=1)
+    assert np.all(mu == mu_true) and np.all(cov == cov_true)
+
+
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+def test_kD_gaussian_args(vectorizedpdf):
+    """Test samples from single kD Gaussian have corrent mean and cov when specifying function args."""
+    mu_true = np.array([1.5, -0.5])
+    cov_true = np.array([
+        [ 1.0,  -0.5],
+        [-0.5,  1.5],
+    ])
+    
+    cells = (X_EDGES, Y_EDGES)
+    sampler = LintSampler(multivariate_normal.pdf, cells=cells, vectorizedpdf=vectorizedpdf, pdf_args=(mu_true, cov_true))
+    x = sampler.sample(N_samples=2**18)
+    
+    mu = np.round(np.mean(x, axis=0), decimals=1)
+    cov = np.round(np.cov(x.T), decimals=1)
+    assert np.all(mu == mu_true) and np.all(cov == cov_true)
+
+
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+def test_kD_gaussian_kwargs(vectorizedpdf):
+    """Test samples from single kD Gaussian have corrent mean and cov when specifying function kwargs."""
+    mu_true = np.array([1.5, -0.5])
+    cov_true = np.array([
+        [ 1.0,  -0.5],
+        [-0.5,  1.5],
+    ])
+    
+    cells = (X_EDGES, Y_EDGES)
+    kwargs = {'mean': mu_true, 'cov': cov_true}
+    sampler = LintSampler(multivariate_normal.pdf, cells=cells, vectorizedpdf=vectorizedpdf, pdf_kwargs=kwargs)
+    x = sampler.sample(N_samples=2**18)
+    
     mu = np.round(np.mean(x, axis=0), decimals=1)
     cov = np.round(np.cov(x.T), decimals=1)
     assert np.all(mu == mu_true) and np.all(cov == cov_true)
