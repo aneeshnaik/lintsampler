@@ -118,13 +118,14 @@ class LintSampler:
         vectorizedpdf : boolean
 
         """
-
-        # set args as attributes
-        #self.pdf = pdf
-        #self.vectorizedpdf = vectorizedpdf
+        # set pdf-related parameters as attributes
+        self.pdf = pdf
+        self.vectorizedpdf = vectorizedpdf
+        self.pdf_args = pdf_args
+        self.pdf_kwargs = pdf_kwargs
 
         # set up the sampling grid under the hood
-        self._set_grids(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf, pdf_args=pdf_args, pdf_kwargs=pdf_kwargs)
+        self._set_grids(cells=cells)
         
         # configure random state according to given random seed and QMC params
         self._set_random_state(seed, qmc, qmc_engine)
@@ -289,8 +290,8 @@ class LintSampler:
 
         return X
 
-    def resetgrid(self,cells=()):
-        """Reset the sample grid without changing the pdf.
+    def reset_grid(self, cells):
+        """Reset the sampling grid(s) without changing the pdf.
         
         Parameters
         ----------
@@ -304,10 +305,9 @@ class LintSampler:
             inferred dimensionality of the problem.
                 
         """
-        self._setgrid(cells)
+        self._set_grids(cells=cells)
 
-
-    def _set_grids(self, pdf, cells, vectorizedpdf, pdf_args, pdf_kwargs):
+    def _set_grids(self, cells):
         """Construct the cells for sampling.
 
         Parameters
@@ -351,12 +351,18 @@ class LintSampler:
         """
         
         # if cells is a non-1D list, then multiple grids, otherwise 1 grid
+        gargs = {
+            'pdf': self.pdf,
+            'vectorizedpdf': self.vectorizedpdf,
+            'pdf_args': self.pdf_args,
+            'pdf_kwargs': self.pdf_kwargs,
+        }
         if isinstance(cells, list) and not _is_1D_iterable(cells):
             self.ngrids = len(cells)
-            self.grids = [Grid(pdf=pdf, cells=ci, vectorizedpdf=vectorizedpdf, pdf_args=pdf_args, pdf_kwargs=pdf_kwargs) for ci in cells]
+            self.grids = [Grid(cells=ci, **gargs) for ci in cells]
         else:
             self.ngrids = 1
-            self.grids = [Grid(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf, pdf_args=pdf_args, pdf_kwargs=pdf_kwargs)]
+            self.grids = [Grid(cells=cells, **gargs)]
         self.dim = self.grids[0].dim
     
         # loop over grid pairs and check no overlap

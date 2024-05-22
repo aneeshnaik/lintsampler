@@ -395,7 +395,7 @@ def test_1D_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
 @pytest.mark.parametrize("qmc,qmc_engine", [(False, None), (True, None), (True, Halton(d=3))])
 def test_kD_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
-    """Test samples from single kD Gaussian have corrent mean and cov."""
+    """Test samples from single kD Gaussian have correct mean and cov."""
     mu_true = np.array([1.5, -0.5])
     cov_true = np.array([
         [ 1.0,  -0.5],
@@ -404,6 +404,28 @@ def test_kD_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     dist = multivariate_normal(mean=mu_true, cov=cov_true)
 
     sampler = LintSampler(dist.pdf, cells=cells, vectorizedpdf=vectorizedpdf, qmc=qmc, qmc_engine=qmc_engine)
+    x = sampler.sample(N_samples=2**18)
+
+    mu = np.round(np.mean(x, axis=0), decimals=1)
+    cov = np.round(np.cov(x.T), decimals=1)
+    assert np.all(mu == mu_true) and np.all(cov == cov_true)
+
+
+def test_kD_gaussian_reset():
+    """Test samples from single kD Gaussian have correct mean and cov after resetting grid"""
+    mu_true = np.array([1.5, -0.5])
+    cov_true = np.array([
+        [ 1.0,  -0.5],
+        [-0.5,  1.5],
+    ])
+    dist = multivariate_normal(mean=mu_true, cov=cov_true)
+
+    c1 = (X_EDGES, Y_EDGES)
+    c2 = [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES), (X1_EDGES, Y0_EDGES), (X1_EDGES, Y1_EDGES)]
+    
+    sampler = LintSampler(dist.pdf, cells=c1, vectorizedpdf=True)
+    x = sampler.sample(N_samples=2**18)
+    sampler.reset_grid(cells=c2)
     x = sampler.sample(N_samples=2**18)
 
     mu = np.round(np.mean(x, axis=0), decimals=1)
