@@ -3,6 +3,7 @@ import warnings
 from scipy.stats.qmc import QMCEngine, Sobol
 from .grid import Grid
 from .utils import _check_N_samples, _is_1D_iterable, _choice, _check_hyperbox_overlap
+from .sampling import _grid_sample
 
 
 class LintSampler:
@@ -258,7 +259,7 @@ class LintSampler:
         if self.ngrids == 1:
 
             # call the gridded sampler
-            X = self.grids[0].sample(u=u)
+            X = _grid_sample(self.grids[0], u)
 
         else:
             grid_masses = np.array([g.total_mass for g in self.grids])
@@ -274,7 +275,7 @@ class LintSampler:
                 if m.any():
                     usub = u[grid_choice == i]
                     usub[:, -1] = (usub[:, -1] - starts[i]) / (ends[i] - starts[i])
-                    X = np.vstack((X, self.grids[i].sample(usub)))
+                    X = np.vstack((X, _grid_sample(self.grids[i], usub)))
 
         # final shuffle (important if using QMC with multiple grids)
         if N_samples:

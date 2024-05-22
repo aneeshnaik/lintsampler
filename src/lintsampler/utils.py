@@ -6,6 +6,7 @@ def _is_1D_iterable(arr):
     # TODO: docstring
     return hasattr(arr, "__len__") and not hasattr(arr[0], "__len__")
 
+
 def _check_hyperbox_overlap(A_mins, A_maxs, B_mins, B_maxs):
     """
     Test whether two hyperboxes A and B overlap.

@@ -3,11 +3,13 @@
 import numpy as np
 from functools import reduce
 from .utils import _is_1D_iterable, _choice
-from .unitsample_kd import _unitsample_kd
 
 
 class Grid:
-    def __init__(self, pdf, cells, vectorizedpdf=False, pdf_args=(), pdf_kwargs={}):
+    def __init__(
+        self, pdf, cells,
+        vectorizedpdf=False, pdf_args=(), pdf_kwargs={}
+    ):
 
         # store PDF and related parameters as attributes
         self.pdf = pdf
@@ -63,26 +65,39 @@ class Grid:
         self.f = self._evaluate_pdf()
         self.masses = self._calculate_faverages() * self._calculate_volumes()
         self.total_mass = np.sum(self.masses)
+
+    def corners(self, cells):
+        #TODO fix docstring
+        """From gridded densities, get densities on 2^k corners of given cells.
+
+        Parameters
+        ----------
+        f : k-dim numpy array, shape (N0+1 x N1+1 x ... x N{k-1}+1)
+            Grid of densities evaluated at corners of k-dimensional grid.
+        cells : 2-d numpy array, shape (N, k)
+            Grid indices of N chosen cells along the k dimensions of the grid.
+            
+        Returns
+        -------
+        corners : 2^k-tuple of 1D numpy arrays, each length N
+            Densities at corners of given cells. Conventional ordering applies,
+            e.g., in 3D: corners = (f000, f001, f010, f011, f100, f101, f110, f111).
+
+        """
+        # loop over 2^k corners, get densities at each
+        corners = []
+        for i in range(2**self.dim):
+            
+            # binary representation of corner, e.g. [0,0,...,0] is first corner
+            n = np.binary_repr(i, width=self.dim)
+            n = np.array([int(c) for c in n], dtype=int)
     
-    def sample(self, u):
-        # TODO: docstring
-        
-        # randomly choose grid cell(s)
-        cells = self._choose(u=u[..., -1])
-
-        # get 2^k-tuple of densities at cell corners
-        corners = self._corners(cells)
-
-        # sample on unit hypercube
-        z = _unitsample_kd(*corners, u=u[..., :-1])
-
-        # rescale coordinates (loop over dimensions)
-        for d in range(self.dim):
-            e = self.edgearrays[d]
-            c = cells[:, d]
-            z[:, d] = e[c] + np.diff(e)[c] * z[:, d]
-        
-        return z
+            # get densities on given corners
+            idx = cells + n
+            idx = np.split(idx.T, self.dim)
+            idx = tuple([idxi.squeeze() for idxi in idx])
+            corners.append(self.f[idx])
+        return tuple(corners)
 
     def _evaluate_pdf(self):
         """Evaluate the pdf on a grid, handling the flag for vectorized.
@@ -186,79 +201,3 @@ class Grid:
         shape = tuple([d.size for d in diffarrays])
         vols = reduce(np.outer, diffarrays).reshape(shape)
         return vols
-    
-
-    
-    def _choose(self, u):
-        """From k-dimensional grid of densities, choose mass-weighted cell(s).
-
-        Given a k-dimensional grid, shaped (N0 x N1 x ... x N{k-1}), the user
-        specifies a sequence of k 1D arrays (lengths N0+1, N1+1, etc.) representing
-        the (not necessarily evenly spaced) gridlines along each dimension, and a
-        kD array (shape N0+1 x N1+1 x ...) representing the densities at the grid
-        corners. This function then calculates the mass of each grid cell according
-        to the trapezoid rule (i.e., the average density over all 2**k corners times
-        the volume of the cell), then randomly chooses a cell (or several cell) from
-        the set of cells, weighting each cell by its mass in this choice.
-
-        Parameters
-        ----------
-        *edgearrays : 1 or more 1D numpy arrays
-            k arrays representing 'edge lines' of k-dimensional grid. E.g., if grid
-            is 3D and shaped N0 x N1 x N2, then provide 3 1D arrays, shaped (N0+1,),
-            (N1+1,), (N2+1,) respectively. The edges do *not* need to be evenly
-            spaced.
-        f : k-dim numpy array, shape (N0+1 x N1+1 x ... x N{k-1}+1)
-            Grid of densities evaluated at corners of k-dimensional grid.
-        u : 1D numpy array, length N_cells
-            Array of uniform samples, length equal to number of desired cells.
-
-        Returns
-        -------
-        idx : 2D numpy array (N_cells x k)
-            Indices along each dimension of randomly sampled cells.
-        """
-        # TODO: docstring
-        # normalise mass and flatten into probability array
-        m_norm = self.masses / self.masses.sum()
-        p = m_norm.flatten()
-
-        # choose cells
-        cells = _choice(p=p, u=u)
-
-        # unravel 1D cell indices into k-D grid indices
-        idx = np.stack(np.unravel_index(cells, m_norm.shape), axis=-1)
-        return idx
-    
-    def _corners(self, cells):
-        #TODO fix docstring
-        """From gridded densities, get densities on 2^k corners of given cells.
-
-        Parameters
-        ----------
-        f : k-dim numpy array, shape (N0+1 x N1+1 x ... x N{k-1}+1)
-            Grid of densities evaluated at corners of k-dimensional grid.
-        cells : 2-d numpy array, shape (N, k)
-            Grid indices of N chosen cells along the k dimensions of the grid.
-            
-        Returns
-        -------
-        corners : 2^k-tuple of 1D numpy arrays, each length N
-            Densities at corners of given cells. Conventional ordering applies,
-            e.g., in 3D: corners = (f000, f001, f010, f011, f100, f101, f110, f111).
-
-        """
-        # loop over 2^k corners, get densities at each
-        corners = []
-        for i in range(2**self.dim):
-            
-            # binary representation of corner, e.g. [0,0,...,0] is first corner
-            n = np.binary_repr(i, width=self.dim)
-            n = np.array([int(c) for c in n], dtype=int)
-    
-            # get densities on given corners
-            idx = cells + n
-            idx = np.split(idx.T, self.dim)
-            idx = tuple([idxi.squeeze() for idxi in idx])
-            corners.append(self.f[idx])
-        return tuple(corners)

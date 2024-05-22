@@ -1,7 +1,41 @@
 import numpy as np
 from math import log2
-from .utils import _multiply_array_slice
-from .unitsample_1d import _unitsample_1d
+from .utils import _multiply_array_slice, _choice
+
+
+def _unitsample_1d(f0, f1, u):
+    """Convert uniform samples to single 1D lintsamples on unit interval.
+    
+    `f0` and `f1` are 1D numpy arrays length N, representing densities at x=0
+    and x=1 respectively for N cells. `u` is also a 1D numpy array length N, 
+    giving uniform samples U(0, 1) to be converted to N samples from 1D linear
+    interpolant on interval (0, 1). This works as follows:
+    where f0 == f1: samples = u
+    elsewhere: samples = (-f0 + sqrt(f0^2 + (f1^2-f0^2)*u)) / (f1-f0)
+
+    Parameters
+    ----------
+    f0 : 1D numpy array, length N (same length as f1 & u)
+        Array of densities at x=0.
+    f1 : 1D numpy array, length N (same length as f0 & u)
+        Array of densities at x=1.
+    u : 1D numpy array, length N (same length as f0 & f1)
+        Uniform samples ~U(0,1).
+
+    Returns
+    -------
+    samples : 1D array, length N
+        Samples from cells.
+    """
+    # where f0 == f1: samples = u
+    # elsewhere, samples = (-f0 + sqrt(f0^2 + (f1^2-f0^2)*u)) / (f1-f0)
+    m = f0 == f1
+    z = np.copy(u)
+    u = u[~m]
+    f0 = f0[~m]
+    f1 = f1[~m]
+    z[~m] = (-f0 + np.sqrt(f0**2 + (f1**2 - f0**2) * u)) / (f1 - f0)
+    return z
 
 
 def _unitsample_kd(*f, u):
@@ -67,3 +101,31 @@ def _unitsample_kd(*f, u):
         samples[:, d] = _unitsample_1d(f0, f1, u=u[:, d])
 
     return samples
+
+
+def _grid_sample(grid, u):
+    # TODO: docstring
+    
+    # get flattened array of grid cell probabilities
+    m_norm = grid.masses / grid.masses.sum()
+    p = m_norm.flatten()
+
+    # choose cells (array of flattened indices)
+    cells = _choice(p=p, u=u[..., -1])
+
+    # unravel 1D cell indices into k-D grid indices
+    cells = np.stack(np.unravel_index(cells, m_norm.shape), axis=-1)
+
+    # get 2^k-tuple of densities at cell corners
+    corners = grid.corners(cells)
+
+    # sample on unit hypercube
+    z = _unitsample_kd(*corners, u=u[..., :-1])
+
+    # rescale coordinates (loop over dimensions)
+    for d in range(grid.dim):
+        e = grid.edgearrays[d]
+        c = cells[:, d]
+        z[:, d] = e[c] + np.diff(e)[c] * z[:, d]
+    
+    return z
