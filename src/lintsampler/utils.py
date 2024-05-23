@@ -1,10 +1,20 @@
 import numpy as np
-from scipy.stats.qmc import QMCEngine, Sobol
 
 
-def _is_1D_iterable(arr):
-    # TODO: docstring
-    return hasattr(arr, "__len__") and not hasattr(arr[0], "__len__")
+def _is_1D_iterable(obj):
+    """Check if object is 1D iterable (has length but first element doesn't).
+    
+    Parameters
+    ----------
+    obj : any
+        Object to check
+    
+    Returns
+    is_1D_iterable : bool
+        True if object is 1D iterable (is iterable but first element isn't),
+        False otherwise.
+    """
+    return hasattr(obj, "__len__") and not hasattr(obj[0], "__len__")
 
 
 def _all_are_instances(iterable, type):
@@ -48,13 +58,26 @@ def _check_hyperbox_overlap(A_mins, A_maxs, B_mins, B_maxs):
     """
     return not np.any((A_maxs <= B_mins) | (B_maxs <= A_mins))
 
-def _choice(p, u, return_cdf=False):
-    """Given probability array and set of uniform samples, return indices."""
+
+def _choice(p, u):
+    """Given probability array and set of uniform samples, return indices.
+    
+    Parameters
+    ----------
+    p : array
+        1D array of probabilities, shape (N_idx,)
+    u : array
+        1D array of uniform samples, ~U(0,1), shape (N_u,)
+    
+    Returns
+    -------
+    idx : array
+        1D array of integers These correspond to indices from the probability
+        array `p`. Shape (N_u,)
+    """
     cdf = p.cumsum()
     cdf /= cdf[-1]
     idx = cdf.searchsorted(u, side='right')
-    if return_cdf:
-        return idx, cdf
     return idx
 
 
@@ -75,7 +98,6 @@ def _multiply_array_slice(arr, factor, axis, idx):
     Returns
     -------
     None
-
     """
     I = [slice(None)] * arr.ndim
     I[axis] = idx
