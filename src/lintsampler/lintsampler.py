@@ -251,16 +251,15 @@ class LintSampler:
             # get list of grid masses
             grid_masses = np.array([g.total_mass for g in self.grids])
             
-            # normalise to probability array
+            # normalise to probability array, 1D array len self.ngrids
             p = grid_masses / grid_masses.sum()
 
             # choose grids:
-            # grid_choice is 1D array of grid indices, length N_samples
-            # cdf is 1D array giving CDF over grids, length self.ngrids
-            grid_choice, cdf = _choice(p, u[:, -1], return_cdf=True)
-            
-            # append 0 to start of PDF, (now 1D array, length self.ngrids+1)
-            cdf = np.append(0, cdf)
+            # grid_choice is 1D array of grid indices, length N_samples            
+            grid_choice = _choice(p, u[:, -1])
+
+            # cdf is 1D array giving CDF over grids, length self.ngrids + 1
+            cdf = np.append(0, p.cumsum())
             
             # extremes of CDF intervals (each len self.ngrids)
             starts = cdf[:-1]
