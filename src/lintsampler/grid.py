@@ -1,5 +1,6 @@
 import numpy as np
 from functools import reduce
+from warnings import warn
 from .utils import _is_1D_iterable, _choice
 
 
@@ -160,7 +161,9 @@ class DensityGrid:
         -------
         None
         """
-        #TODO: raise error if densities already evaluated
+        if self.densities_evaluated:
+            warn("Grid.evaluate: PDF being unnecessarily evaluated again.")
+            self.reset_densities()
 
         # number of vertices in grid
         npts = np.prod(self.edgeshape)

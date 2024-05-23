@@ -1,25 +1,17 @@
-# TODO: input premade Grid instance (not evaluated)
-# TODO: input premade Grid instance (pre-evaluated)
-# TODO: Grid test suite
 # TODO: test example of single-cell grid(s)
 
 import pytest
 import numpy as np
 from scipy.stats import norm, multivariate_normal
 from scipy.stats.qmc import Sobol, Halton
-from lintsampler import LintSampler
+from lintsampler import LintSampler, DensityGrid
 
 X_EDGES = np.linspace(-10, 10, 65)
 Y_EDGES = np.linspace(-5, 5, 33)
-XY_GRID = np.stack(np.meshgrid(X_EDGES, Y_EDGES, indexing='ij'), axis=-1)
 X0_EDGES = np.linspace(-10, 0, 65)
 X1_EDGES = np.linspace(0, 10, 65)
 Y0_EDGES = np.linspace(-5, 0, 33)
 Y1_EDGES = np.linspace(0, 5, 33)
-XY00_GRID = np.stack(np.meshgrid(X0_EDGES, Y0_EDGES, indexing='ij'), axis=-1)
-XY01_GRID = np.stack(np.meshgrid(X0_EDGES, Y1_EDGES, indexing='ij'), axis=-1)
-XY10_GRID = np.stack(np.meshgrid(X1_EDGES, Y0_EDGES, indexing='ij'), axis=-1)
-XY11_GRID = np.stack(np.meshgrid(X1_EDGES, Y1_EDGES, indexing='ij'), axis=-1)
 CELLS_1D = [
     X_EDGES, 
     tuple(X_EDGES),
@@ -41,49 +33,7 @@ B1 = np.ones(10)
 B2 = np.array([9.0, 8.0, 10.0, 12.0])
 B3 = np.array([1.0, 1.5, np.nan])
 B4 = np.array([1.0, 1.5, np.inf])
-NON_MONOTONIC_CELLS_1D = [
-    B0, tuple(B0), list(B0),
-    B1, tuple(B1), list(B1),
-    B2, tuple(B2), list(B2),
-    [X0_EDGES, B0],
-    [X0_EDGES, B1],
-    [X0_EDGES, B2],
-]
-NON_MONOTONIC_CELLS_2D = [
-    (X_EDGES, B0), (tuple(X_EDGES), tuple(B0)), (list(X_EDGES), list(B0)),
-    (X_EDGES, B1),
-    (X_EDGES, B2),
-    [(B0, Y0_EDGES), (B0, Y1_EDGES)],
-    [(tuple(B0), tuple(Y0_EDGES)), (tuple(B0), tuple(Y1_EDGES))],
-    [(list(B0), list(Y0_EDGES)), (list(B0), list(Y1_EDGES))],
-    [(B1, Y0_EDGES), (B1, Y1_EDGES)],
-    [(B2, Y0_EDGES), (B2, Y1_EDGES)],
-]
-NON_FINITE_CELLS_1D = [
-    B3, tuple(B3), list(B3),
-    B4, tuple(B4), list(B4),
-    [X0_EDGES, B3],
-    [X0_EDGES, B4],
-]
-NON_FINITE_CELLS_2D = [
-    (X_EDGES, B3), (tuple(X_EDGES), tuple(B3)), (list(X_EDGES), list(B3)),
-    (X_EDGES, B4),
-    [(B3, Y0_EDGES), (B3, Y1_EDGES)],
-    [(tuple(B3), tuple(Y0_EDGES)), (tuple(B3), tuple(Y1_EDGES))],
-    [(list(B3), list(Y0_EDGES)), (list(B3), list(Y1_EDGES))],
-    [(B4, Y0_EDGES), (B4, Y1_EDGES)],
-]
-OVERLAPPING_CELLS_2D = [
-    [(np.array([1.9, 2.4, 2.9]), Y0_EDGES), (np.array([1.0, 1.5, 2.0]), Y0_EDGES)],
-]
-MISMATCHED_CELLS_2D = [
-    [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]))],
-]
-NONSENSICAL_CELLS = [
-    1, np.random.default_rng(42),
-    [[X0_EDGES, Y0_EDGES], [X0_EDGES, Y1_EDGES]],
-    ((X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES)),
-]
+
 
 
 def neg_pdf_1D(x):
@@ -158,6 +108,21 @@ def test_f_bad_shape(pdf, cells, vectorizedpdf):
         LintSampler(cells=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
 
 
+def test_unnecessary_pdf_setting():
+    """Test warning raised if extraneous setting passed to None PDF"""
+    grid = DensityGrid(X_EDGES)
+    grid.evaluate(pdf=norm.pdf, vectorizedpdf=True)
+    with pytest.warns(UserWarning):
+        LintSampler(cells=grid, vectorizedpdf=True)
+
+
+@pytest.mark.parametrize("pdf", [True, 10, np.random.default_rng(42)])
+def test_noncallable_pdf(pdf):
+    """Test error raised if PDF is not a callable"""
+    with pytest.raises(TypeError):
+        LintSampler(cells=X_EDGES, pdf=pdf)
+
+
 ## INPUT CHECKING: SEED ########################################################
 
 
@@ -194,14 +159,31 @@ def test_non_power2_sobol_warning():
 
 ## INPUT CHECKING: CELLS #######################################################
 
-@pytest.mark.parametrize("cells", NON_MONOTONIC_CELLS_1D)
+
+@pytest.mark.parametrize("cells", [
+    B0, tuple(B0), list(B0),
+    B1, tuple(B1), list(B1),
+    B2, tuple(B2), list(B2),
+    [X0_EDGES, B0],
+    [X0_EDGES, B1],
+    [X0_EDGES, B2],
+])
 def test_1D_edges_non_monotonic(cells):
     """Test error raised if 1D edges not monotonic"""
     with pytest.raises(ValueError):
         LintSampler(cells=cells, pdf=norm.pdf)
 
 
-@pytest.mark.parametrize("cells", NON_MONOTONIC_CELLS_2D)
+@pytest.mark.parametrize("cells", [
+    (X_EDGES, B0), (tuple(X_EDGES), tuple(B0)), (list(X_EDGES), list(B0)),
+    (X_EDGES, B1),
+    (X_EDGES, B2),
+    [(B0, Y0_EDGES), (B0, Y1_EDGES)],
+    [(tuple(B0), tuple(Y0_EDGES)), (tuple(B0), tuple(Y1_EDGES))],
+    [(list(B0), list(Y0_EDGES)), (list(B0), list(Y1_EDGES))],
+    [(B1, Y0_EDGES), (B1, Y1_EDGES)],
+    [(B2, Y0_EDGES), (B2, Y1_EDGES)],
+])
 def test_kD_edges_non_monotonic(cells):
     """Test error raised if 2D edges not monotonic"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
@@ -209,14 +191,26 @@ def test_kD_edges_non_monotonic(cells):
         LintSampler(cells=cells, pdf=dist.pdf)
 
 
-@pytest.mark.parametrize("cells", NON_FINITE_CELLS_1D)
+@pytest.mark.parametrize("cells", [
+    B3, tuple(B3), list(B3),
+    B4, tuple(B4), list(B4),
+    [X0_EDGES, B3],
+    [X0_EDGES, B4],
+])
 def test_1D_edges_non_finite(cells):
     """Test error raised if 1D cells contain non-finite values (NaN/inf etc)"""
     with pytest.raises(ValueError):
         LintSampler(cells=cells, pdf=norm.pdf)
 
 
-@pytest.mark.parametrize("cells", NON_FINITE_CELLS_2D)
+@pytest.mark.parametrize("cells", [
+    (X_EDGES, B3), (tuple(X_EDGES), tuple(B3)), (list(X_EDGES), list(B3)),
+    (X_EDGES, B4),
+    [(B3, Y0_EDGES), (B3, Y1_EDGES)],
+    [(tuple(B3), tuple(Y0_EDGES)), (tuple(B3), tuple(Y1_EDGES))],
+    [(list(B3), list(Y0_EDGES)), (list(B3), list(Y1_EDGES))],
+    [(B4, Y0_EDGES), (B4, Y1_EDGES)],
+])
 def test_kD_edges_non_finite(cells):
     """Test error raised if 2D cells contain non-finite values (NaN/inf etc)"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
@@ -231,7 +225,9 @@ def test_1D_edges_overlapping():
         LintSampler(cells=cells, pdf=norm.pdf)
 
 
-@pytest.mark.parametrize("cells", OVERLAPPING_CELLS_2D)
+@pytest.mark.parametrize("cells", [
+    [(np.array([1.9, 2.4, 2.9]), Y0_EDGES), (np.array([1.0, 1.5, 2.0]), Y0_EDGES)],
+])
 def test_kD_edges_overlapping(cells):
     """Test error raised if distinct kD grids are overlapping"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
@@ -239,7 +235,10 @@ def test_kD_edges_overlapping(cells):
         LintSampler(cells=cells, pdf=dist.pdf)
 
 
-@pytest.mark.parametrize("cells", MISMATCHED_CELLS_2D)
+@pytest.mark.parametrize("cells", [
+    [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]))],
+    [DensityGrid((X0_EDGES, Y0_EDGES)), DensityGrid((X0_EDGES, Y1_EDGES, np.array([3., 4., 5.])))],
+])
 def test_kD_mismatched_dims(cells):
     """Test error raised if distinct kD grids have mismatched dimensions"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
@@ -247,14 +246,44 @@ def test_kD_mismatched_dims(cells):
         LintSampler(cells=cells, pdf=dist.pdf)
 
 
-@pytest.mark.parametrize("cells", NONSENSICAL_CELLS)
+@pytest.mark.parametrize("cells", [
+    1, np.random.default_rng(42),
+    [[X0_EDGES, Y0_EDGES], [X0_EDGES, Y1_EDGES]],
+    ((X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES)),
+])
 def test_nonsensical_cells(cells):
     """Test error raised if cells are nonsensical types"""
     with pytest.raises(TypeError):
         LintSampler(cells=cells, pdf=norm.pdf)
 
 
+def test_double_evaluation():
+    """Test warning raised if preevaluated grid is evaluated again"""
+    grid = DensityGrid(X_EDGES)
+    grid.evaluate(pdf=norm.pdf, vectorizedpdf=True)
+    with pytest.warns(UserWarning):
+        LintSampler(cells=grid, pdf=norm.pdf)
+
+
+def test_no_pdf():
+    """Test error raised if no preevaluated densities and no pdf"""
+    grid = DensityGrid(X_EDGES)
+    with pytest.raises(ValueError):
+        LintSampler(cells=grid)
+
+
+def test_no_pdf_on_reset():
+    """Test error raised if sampler without PDF has cells reset with non-evaluated grid"""
+    grid1 = DensityGrid(X_EDGES)
+    grid2 = DensityGrid(X0_EDGES)
+    grid1.evaluate(pdf=norm.pdf, vectorizedpdf=True)
+    sampler = LintSampler(cells=grid1)
+    with pytest.raises(ValueError):
+        sampler.reset_cells(grid2)
+
+
 ## INPUT CHECKING: QMC #########################################################
+
 
 @pytest.mark.parametrize("qmc_engine",
     [
@@ -308,6 +337,34 @@ def test_1D_output_shapes(cells, N_samples, vectorizedpdf, qmc):
         assert x.shape == (N_samples,)
 
 
+@pytest.mark.parametrize("N_samples", [None, 16])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("qmc", [True, False])
+def test_1D_output_shapes_preconstructed_grid(N_samples, vectorizedpdf, qmc):
+    """Single sample in 1D -> float, multiple samples -> 1D array"""
+    grid = DensityGrid(X_EDGES)
+    sampler = LintSampler(cells=grid, pdf=norm.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
+    x = sampler.sample(N_samples=N_samples)
+    if N_samples is None:
+        assert isinstance(x, float)
+    else:
+        assert x.shape == (N_samples,)
+
+
+@pytest.mark.parametrize("N_samples", [None, 16])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("qmc", [True, False])
+def test_1D_output_shapes_preconstructed_grids(N_samples, vectorizedpdf, qmc):
+    """Single sample in 1D -> float, multiple samples -> 1D array"""
+    grids = [DensityGrid(X0_EDGES), DensityGrid(X1_EDGES)] 
+    sampler = LintSampler(cells=grids, pdf=norm.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
+    x = sampler.sample(N_samples=N_samples)
+    if N_samples is None:
+        assert isinstance(x, float)
+    else:
+        assert x.shape == (N_samples,)
+
+
 @pytest.mark.parametrize("cells", CELLS_2D)
 @pytest.mark.parametrize("N_samples", [None, 16])
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
@@ -316,6 +373,36 @@ def test_kD_output_shapes(cells, N_samples, vectorizedpdf, qmc):
     """Single sample in kD -> k-vector, multiple samples -> 2D array (N, k)"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
     sampler = LintSampler(cells=cells, pdf=dist.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
+    x = sampler.sample(N_samples=N_samples)
+    if N_samples is None:
+        assert x.shape == (2,)
+    else:
+        assert x.shape == (N_samples, 2)
+
+
+@pytest.mark.parametrize("N_samples", [None, 16])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("qmc", [True, False])
+def test_kD_output_shapes_preconstructed_grid(N_samples, vectorizedpdf, qmc):
+    """Single sample in kD -> k-vector, multiple samples -> 2D array (N, k)"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    grid = DensityGrid((X_EDGES, Y_EDGES))    
+    sampler = LintSampler(cells=grid, pdf=dist.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
+    x = sampler.sample(N_samples=N_samples)
+    if N_samples is None:
+        assert x.shape == (2,)
+    else:
+        assert x.shape == (N_samples, 2)
+
+
+@pytest.mark.parametrize("N_samples", [None, 16])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("qmc", [True, False])
+def test_kD_output_shapes_preconstructed_grids(N_samples, vectorizedpdf, qmc):
+    """Single sample in kD -> k-vector, multiple samples -> 2D array (N, k)"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    grids = [DensityGrid((X0_EDGES, Y0_EDGES)), DensityGrid((X0_EDGES, Y1_EDGES)), DensityGrid((X1_EDGES, Y0_EDGES)), DensityGrid((X1_EDGES, Y1_EDGES))]
+    sampler = LintSampler(cells=grids, pdf=dist.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
     x = sampler.sample(N_samples=N_samples)
     if N_samples is None:
         assert x.shape == (2,)
@@ -390,6 +477,33 @@ def test_1D_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     assert (mu, sig) == (mu_true, sig_true)
 
 
+def test_1D_gaussian_preconstructed():
+    """Test samples from a 1D gaussian have correct mean and variance with preconstructed grid"""
+    mu_true = -2.0
+    sig_true = 1.8
+    d = norm(loc=mu_true, scale=sig_true)
+    grid = DensityGrid(X_EDGES)
+    sampler = LintSampler(cells=grid, pdf=d.pdf, vectorizedpdf=True)
+    x = sampler.sample(N_samples=2**17)
+    mu = np.round(np.mean(x), decimals=0)
+    sig = np.round(np.std(x), decimals=1)
+    assert (mu, sig) == (mu_true, sig_true)
+
+
+def test_1D_gaussian_preevaluated():
+    """Test samples from a 1D gaussian have correct mean and variance with preevaluated grid"""
+    mu_true = -2.0
+    sig_true = 1.8
+    d = norm(loc=mu_true, scale=sig_true)
+    grid = DensityGrid(X_EDGES)
+    grid.evaluate(pdf=d.pdf, vectorizedpdf=True)
+    sampler = LintSampler(cells=grid)
+    x = sampler.sample(N_samples=2**17)
+    mu = np.round(np.mean(x), decimals=0)
+    sig = np.round(np.std(x), decimals=1)
+    assert (mu, sig) == (mu_true, sig_true)
+
+
 @pytest.mark.parametrize("cells", CELLS_2D)
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
 @pytest.mark.parametrize("qmc,qmc_engine", [(False, None), (True, None), (True, Halton(d=3))])
@@ -403,6 +517,43 @@ def test_kD_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     dist = multivariate_normal(mean=mu_true, cov=cov_true)
 
     sampler = LintSampler(cells=cells, pdf=dist.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, qmc_engine=qmc_engine)
+    x = sampler.sample(N_samples=2**18)
+
+    mu = np.round(np.mean(x, axis=0), decimals=1)
+    cov = np.round(np.cov(x.T), decimals=1)
+    assert np.all(mu == mu_true) and np.all(cov == cov_true)
+
+
+def test_kD_gaussian_preconstructed():
+    """Test samples from single kD Gaussian have correct mean and cov when giving preconstructed grid."""
+    mu_true = np.array([1.5, -0.5])
+    cov_true = np.array([
+        [ 1.0,  -0.5],
+        [-0.5,  1.5],
+    ])
+    dist = multivariate_normal(mean=mu_true, cov=cov_true)
+
+    grid = DensityGrid((X_EDGES, Y_EDGES))
+    sampler = LintSampler(cells=grid, pdf=dist.pdf, vectorizedpdf=True)
+    x = sampler.sample(N_samples=2**18)
+
+    mu = np.round(np.mean(x, axis=0), decimals=1)
+    cov = np.round(np.cov(x.T), decimals=1)
+    assert np.all(mu == mu_true) and np.all(cov == cov_true)
+
+
+def test_kD_gaussian_preevaluated():
+    """Test samples from single kD Gaussian have correct mean and cov when densities provided on pre-evaluated grid."""
+    mu_true = np.array([1.5, -0.5])
+    cov_true = np.array([
+        [ 1.0,  -0.5],
+        [-0.5,  1.5],
+    ])
+    dist = multivariate_normal(mean=mu_true, cov=cov_true)
+
+    grid = DensityGrid((X_EDGES, Y_EDGES))
+    grid.evaluate(dist.pdf, vectorizedpdf=True)
+    sampler = LintSampler(cells=grid)
     x = sampler.sample(N_samples=2**18)
 
     mu = np.round(np.mean(x, axis=0), decimals=1)

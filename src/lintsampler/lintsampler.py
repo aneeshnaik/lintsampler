@@ -1,5 +1,5 @@
 import numpy as np
-import warnings
+from warnings import warn
 from scipy.stats.qmc import QMCEngine, Sobol
 from .grid import DensityGrid
 from .utils import _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
@@ -186,7 +186,7 @@ class LintSampler:
             self._evaluate_pdf()
         else:
             if self.vectorizedpdf or self.pdf_args or self.pdf_kwargs:
-                raise UserWarning(
+                warn(
                     "LintSampler.__init__: " \
                     f"PDF configuration setting given but no PDF provided."
                 )
@@ -308,7 +308,11 @@ class LintSampler:
         if self.pdf:
             self._evaluate_pdf()
         else:
-            self._check_grids_evaluated()
+            if not self._check_grids_evaluated():
+                raise ValueError(
+                    "LintSampler.__init__: " \
+                    f"No densities pre-evaluated on grids and no PDF provided."
+                )
 
     def _set_grids(self, cells):
         """Configure the grid(s) for sampling.
@@ -334,6 +338,7 @@ class LintSampler:
             self.ngrids = len(cells)
             self.grids = cells
         elif isinstance(cells, list) and not _is_1D_iterable(cells):
+            #TODO check all list members same type
             self.ngrids = len(cells)
             self.grids = [DensityGrid(cells=ci) for ci in cells]
         else:
@@ -432,7 +437,7 @@ class LintSampler:
                 
                 # warn if qmc engine provided and RNG seed provided
                 if seed is not None:
-                    warnings.warn(
+                    warn(
                         "LintSampler.__init__: " \
                         "pre-condigured qmc_engine provided, so given random "\
                         "seed won't be used except for final array shuffle."
@@ -445,7 +450,7 @@ class LintSampler:
         # if qmc engine provided but QMC flag off, warn
         else:
             if qmc_engine is not None:
-                warnings.warn(
+                warn(
                     "LintSampler.__init__: " \
                     "provided qmc_engine won't be used as qmc switched off."
                 )
