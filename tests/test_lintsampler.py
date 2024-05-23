@@ -424,7 +424,7 @@ def test_kD_gaussian_reset():
     
     sampler = LintSampler(cells=c1, pdf=dist.pdf, vectorizedpdf=True)
     x = sampler.sample(N_samples=2**18)
-    sampler.reset_grid(cells=c2)
+    sampler.reset_cells(cells=c2)
     x = sampler.sample(N_samples=2**18)
 
     mu = np.round(np.mean(x, axis=0), decimals=1)

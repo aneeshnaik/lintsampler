@@ -58,16 +58,6 @@ def _choice(p, u, return_cdf=False):
     return idx
 
 
-def _check_N_samples(N_samples):
-    """Check requested no. samples is None or positive int, else raise error."""
-    if (N_samples is not None):
-        if not isinstance(N_samples, int):
-            raise TypeError(f"Expected int N_samples, got {type(N_samples)}")
-        elif N_samples <= 0:
-            raise ValueError(f"Expected positive N_samples, got {N_samples}")
-    return
-
-
 def _multiply_array_slice(arr, factor, axis, idx):
     """Multiply (inplace) subslice of array by given factor along given slice.
     

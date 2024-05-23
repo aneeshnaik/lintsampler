@@ -2,15 +2,111 @@ import numpy as np
 import warnings
 from scipy.stats.qmc import QMCEngine, Sobol
 from .grid import DensityGrid
-from .utils import _check_N_samples, _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
+from .utils import _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
 from .sampling import _grid_sample
 
 
 class LintSampler:
-    # TODO: update examples in docstring
-    # TODO: update docstring parameters/attrs etc
-    """Draw sample(s) from density function defined for a list of cells (that may or may not be in a single grid)
+    """Linear interpolant sampler for density function defined on grid(s).
 
+    #TODO extended description
+    #TODO update examples
+
+    Parameters
+    ----------
+    cells : iterable or `DensityGrid`
+        Coordinate grid(s) to draw samples over. Several forms are available. If
+        using a single coordinate grid, then `cells` can be any of:
+        - a 1D iterable (array, list, tuple) representing the cell edges of a 1D
+        grid. So, if the grid has N cells, then the iterable should have N+1
+        elements.
+        - a tuple of 1D iterables, representing the cell edges of a kD grid. If
+        the grid has (N1, N2, ..., Nk) cells, then the tuple should have length
+        k, and the 1D arrays in the tuple should have lengths N1+1, N2+1, ...,
+        Nk+1.
+        - a DensityGrid instance, either with densities pre-evaluated or not. If
+        densities are already evaluated, `pdf` parameter should not be set and
+        vice versa.
+        If using multiple (non-overlapping) coordinate grids, then `cells`
+        should be a list of any of the above. See the examples below for the
+        various usage patterns. 
+    pdf : {None, function}, optional
+        Probability density function from which to draw samples. Function should
+        take coordinate vector (or batch of vectors if vectorized; see
+        `vectorizedpdf` parameter) and return (unnormalised) density (or batch
+        of densities). Additional arguments can be passed to the function via
+        `pdf_args` and `pdf_kwargs` parameters. Default is None, in which case
+        it is assumed that `cells` comprises one instance or several instances
+        of `DensityGrid` already having the densities evaluated (i.e.,
+        `densities_evaluated=True`).
+    vectorizedpdf : bool, optional
+        if True, assumes that the pdf function is vectorized, i.e., it
+        accepts  (..., k)-shaped batches of coordinate vectors and returns
+        (...)-shaped batches of densities. If False, assumes that the pdf
+        function simply accepts (k,)-shaped coordinate vectors and returns
+        single densities. Default is False.
+    pdf_args : tuple, optional
+        Additional positional arguments to pass to pdf function; function
+        call is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty
+        tuple (no additional positional arguments).
+    pdf_kwargs : dict, optional
+        Additional keyword arguments to pass to pdf function; function call
+        is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict
+        (no additional keyword arguments).
+    seed : {None, int, ``numpy.random.Generator``}, optional
+        Seed for ``numpy`` random generator. Can be random generator itself,
+        in which case it is left unchanged. Can also be the seed to a
+        default generator. Default is None, in which case new default
+        generator is created. See ``numpy`` random generator docs for more
+        information.
+    qmc : bool, optional
+        Whether to use Quasi-Monte Carlo sampling. Default is False.
+    qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
+        QMC engine to use if qmc flag above is True. Should be subclass of
+        scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
+        first k dimensions are used for lintsampling, while last dimension is
+        used for cell choice (this happens even if only one cell is given).
+        Default is None. In that case, if qmc is True, then a scrambled Sobol
+        sequence is used.
+
+    Attributes
+    ----------
+    pdf : {None, function}
+        PDF function to evaluate on grid. None if densities pre-evaluated. See
+        corresponding parameter above.
+    vectorizedpdf : bool
+        Whether PDF function is vectorized. See corresponding parameter above.
+    pdf_args : tuple
+        Additional positional arguments for PDF function. See corresponding
+        parameter above.
+    pdf_kwargs : dict
+        Additional keyword arguments for PDF function. See corresponding
+        parameter above.
+    dim : int
+        Dimensionality of PDF / coordinate space.
+    grids : list
+        List of `DensityGrid` instances corresponding to series of coordinate
+        grids passed by the user in `cells` parameter. Single list element
+        if only one grid passed.
+    ngrids : int
+        Number of coordinate grids to sample over (i.e., length of `grids`
+        attribute).
+    qmc : bool
+        Whether to use Quasi-Monte Carlo sampling. See corresponding parameter
+        above.
+    rng : numpy.random.Generator
+        `numpy` random generator used for generating samples. Used alongside
+        `scipy` `QMCEngine` if `qmc` is True.
+    qmc_engine : {None, scipy.stats.qmc.QMCEngine}
+        `scipy` `QMCEngine` used for generating samples if `qmc` is True.
+    
+    Methods
+    -------
+    sample(N_samples=None)
+        Draw samples from given PDF over given grid(s).
+    reset_cells(cells)
+        Reset sampling domain without changing PDF.
+        
     Examples
     --------
     
@@ -66,59 +162,11 @@ class LintSampler:
     This returns a 2D array, shape ``N_samples`` x k: the ``N_samples`` k-D
     samples within the grid.
     """
-
     def __init__(
         self, cells,
         pdf=None, vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
         seed=None, qmc=False, qmc_engine=None
     ):
-        """Initialise a LintSampler instance.
-
-        Parameters
-        ----------
-        pdf : function
-            Probability density function from which to draw samples.
-
-        cells : single array, tuple of arrays or list of tuples of arrays
-            If a single array, the boundary values for a 1D grid. If a tuple of
-            arrays, the boundary values for a grid with dimensionality of the
-            length of the tuple. If a list of tuples of arrays, the boundary
-            values for an arbitrary number of grids with dimensionality the
-            length of the tuples.
-
-        seed : {None, int, ``numpy.random.Generator``}, optional
-            Seed for ``numpy`` random generator. Can be random generator itself,
-            in which case it is left unchanged. Can also be the seed to a
-            default generator. Default is None, in which case new default
-            generator is created. See ``numpy`` random generator docs for more
-            information.
-
-        vectorizedpdf : boolean
-            if True, assumes that the pdf passed is vectorized (i.e. can accept [...,k]-shaped arguments).
-            if False, assumes that the pdf passed accepts k arguments.
-        
-        qmc : bool, optional
-            Whether to use Quasi-Monte Carlo sampling. Default is False.
-    
-        qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
-            QMC engine to use if qmc flag above is True. Should be subclass of
-            scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
-            first k dimensions are used for lintsampling, while last dimension is
-            used for cell choice (this happens even if only one cell is given).
-            Default is None. In that case, if qmc is True, then a scrambled Sobol
-            sequence is used.
-
-        Returns
-        -------
-        None
-
-
-        Attributes
-        ----------
-        pdf : function
-        vectorizedpdf : boolean
-
-        """
         # set pdf-related parameters as attributes
         self.pdf = pdf
         self.vectorizedpdf = vectorizedpdf
@@ -130,39 +178,62 @@ class LintSampler:
         
         # if given, evaluate PDF on grids, else check grids already evaluated
         if self.pdf:
+            if not callable(self.pdf):
+                raise TypeError(
+                    "LintSampler.__init__: " \
+                    f"Given PDF is not callable."
+                )
             self._evaluate_pdf()
         else:
-            self._check_grids_evaluated()
-        
+            if self.vectorizedpdf or self.pdf_args or self.pdf_kwargs:
+                raise UserWarning(
+                    "LintSampler.__init__: " \
+                    f"PDF configuration setting given but no PDF provided."
+                )
+            if not self._check_grids_evaluated():
+                raise ValueError(
+                    "LintSampler.__init__: " \
+                    f"No densities pre-evaluated on grids and no PDF provided."
+                )
+  
         # configure random state according to given random seed and QMC params
         self._set_random_state(seed, qmc, qmc_engine)
 
     def sample(self, N_samples=None):
         """Draw samples from the pdf on the constructed grid(s).
         
-        This function then draws a sample (or N samples) from the specified grid. It first chooses a cell 
-        (or N cells with replacement), weighting them by their mass (estimated by the trapezoid rule) 
-        then samples from k-linear interpolant within the chosen cell(s).
+        This function draws a sample (or N samples) from the given PDF over the
+        given grid(s). It first chooses a grid (or N grids with replacement),
+        weighting them by their total mass, then similarly chooses a cell
+        (or N cells), then samples from the k-linear interpolant within the
+        chosen cell(s).
         
         Parameters
         ----------
-        self : LintSampler
-            The LintSampler instance.
         N_samples : {None, int}, optional
             Number of samples to draw. Default is None, in which case a single
             sample is drawn.
-        funcargs : optional
-            A tuple of optional arguments to be passed directly to the pdf function call.
 
         Returns
         -------
         X : scalar, 1D array (length k OR N_samples) or 2D array (N_samples, k)
             Sample(s) from linear interpolant. Scalar if single sample (i.e.,
-            N_samples is None) in 1D. 1D array if single sample in k-D OR multiple
-            samples in 1D. 2D array if multiple samples in k-D.
+            N_samples is None) in 1D. 1D array if single sample in k-D OR 
+            multiple samples in 1D. 2D array if multiple samples in k-D.
         
         """
-        _check_N_samples(N_samples)
+        # check N_samples sensible
+        if (N_samples is not None):
+            if not isinstance(N_samples, int):
+                raise TypeError(
+                    "LintSampler.sample: "\
+                    f"Expected int N_samples, got {type(N_samples)}"
+                )
+            elif N_samples <= 0:
+                raise ValueError(
+                    "LintSampler.sample: "\
+                    f"Expected positive N_samples, got {N_samples}"
+                )
 
         # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
         # first k dims used for lintsampling, last dim used for cell choice
@@ -171,21 +242,32 @@ class LintSampler:
         else:
             u = self._generate_usamples(1)
         
-        # check that the function can be evaluated at the passed-in points (i.e. needs to take the dimensions as an argument)
-        #if self.eval_type == 'gridsample':
+        # if single grid, gridsample on it
         if self.ngrids == 1:
-
-            # call the gridded sampler
             X = _grid_sample(self.grids[0], u)
 
+        # if multiple grids, choose grids and rescale usamples for cell choice
         else:
+            # get list of grid masses
             grid_masses = np.array([g.total_mass for g in self.grids])
+            
+            # normalise to probability array
             p = grid_masses / grid_masses.sum()
 
+            # choose grids:
+            # grid_choice is 1D array of grid indices, length N_samples
+            # cdf is 1D array giving CDF over grids, length self.ngrids
             grid_choice, cdf = _choice(p, u[:, -1], return_cdf=True)
+            
+            # append 0 to start of PDF, (now 1D array, length self.ngrids+1)
             cdf = np.append(0, cdf)
+            
+            # extremes of CDF intervals (each len self.ngrids)
             starts = cdf[:-1]
             ends = cdf[1:]
+            
+            # loop over grids:
+            # gridsample at each grid, rescaling usamples by CDF interval size
             X = np.empty((0, self.dim))
             for i in range(self.ngrids):
                 m = grid_choice == i
@@ -208,20 +290,17 @@ class LintSampler:
 
         return X
 
-    def reset_grid(self, cells):
+    def reset_cells(self, cells):
         """Reset the sampling grid(s) without changing the pdf.
         
         Parameters
         ----------
-        self : LintSampler
-            The LintSampler instance.
-
+        cells : iterable or `DensityGrid`
+            See `cells` entry in documentation for class constructor.
+        
         Returns
         -------
-        combinations: numpy array
-            All possible combinations of starting and ending points for the
-            inferred dimensionality of the problem.
-                
+        None
         """
         # reset grid(s)
         self._set_grids(cells=cells)
@@ -233,46 +312,17 @@ class LintSampler:
             self._check_grids_evaluated()
 
     def _set_grids(self, cells):
-        """Construct the cells for sampling.
+        """Configure the grid(s) for sampling.
 
         Parameters
         ----------
-        self : LintSampler
-            The LintSampler instance.
-        cells : single array, tuple of arrays or list of tuples of arrays
-            If a single array, the boundary values for a 1D grid. If a tuple of arrays, the
-            boundary values for a grid with dimensionality of the length of the tuple. If
-            a list of tuples of arrays, the boundary values for an arbitrary number of
-            grids with dimensionality the length of the tuples.
+        cells : iterable or `DensityGrid`
+            See `cells` entry in documentation for class constructor.
 
         Returns
         -------
         None
-        
-        Attributes
-        -------
-        eval_type : string
-            The evaluation type, either 'gridsample' or 'freesample'
-        dim : int
-            The inferred dimensionality of the problem
-        edgearrays : list of numpy arrays
-            The arrays defining the edge of the grids
-        edgedims   : tuple of integers, optional, used if eval_type == 'gridsample'
-            The shape of the gridsample grid
-        ngrids : integer, optional, used if eval_type == 'freesample'
-            The number of distinct grids to be constructed
-        gridshape : list of tuple of integers, optional, used if eval_type == 'freesample'
-            The shape of each distinct grid
-        ngridentries : list of integers, optional, used if eval_type == 'freesample'
-            The number of entries in the 
-        nedgegridentries : list of integers, optional, used if eval_type == 'freesample'
-            The number of entries in the offset grids
-        x0 : list of numpy arrays, optional, used if eval_type == 'freesample'
-            The array of the first vertex of the grids
-        x1 : list of numpy arrays, optional, used if eval_type == 'freesample'
-            The array of the last vertex of the grids
         """
-
         # cells cases:
         # - cells is a single pre-made density grid
         # - cells is a list of ditto
@@ -300,8 +350,8 @@ class LintSampler:
                 d1 = grid.dim
                 d2 = self.dim
                 raise ValueError(
-                    f"LintSampler._set_grids: "\
-                    "Grids have mismatched dimensions: {d1} and {d2}"
+                    "LintSampler._set_grids: "\
+                    f"Grids have mismatched dimensions: {d1} and {d2}"
                 )
     
         # loop over grid pairs and check no overlap
@@ -318,55 +368,45 @@ class LintSampler:
                     )
 
     def _evaluate_pdf(self):
-        # TODO: docstring
+        """Loop over DensityGrid instances and evaluate PDF on each.
+
+        Returns
+        -------
+        None
+        """
         for grid in self.grids:
             grid.evaluate(
                 self.pdf, self.vectorizedpdf, self.pdf_args, self.pdf_kwargs
             )
             
     def _check_grids_evaluated(self):
-        # TODO: docstring
+        """Loop over grids and check densities already evaluated.
+
+        Returns
+        -------
+        grids_evaluated : bool
+            Whether all grids in self.grids have densities already evaluated.
+        """
         for grid in self.grids:
             if not grid.densities_evaluated:
-                raise ValueError(
-                    "LintSampler._check_grids_evaluated: " \
-                    f"No densities pre-evaluated on grids and no PDF provided."
-                )
+                return False
+        return True
 
     def _set_random_state(self, seed, qmc, qmc_engine):
-        """Parse QMC-related parameters and set as attributes.
+        """Configure random number generators and set as attributes.
         
         Parameters
-        ----------
-        
-        seed : {None, int, ``numpy.random.Generator``}, optional
-            Seed for ``numpy`` random generator. Can be random generator itself,
-            in which case it is left unchanged. Can also be the seed to a
-            default generator. Default is None, in which case new default
-            generator is created. See ``numpy`` random generator docs for more
-            information.
-
-        qmc : bool, optional
-            Whether to use Quasi-Monte Carlo sampling. Default is False.
-    
-        qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
-            QMC engine to use if qmc flag above is True. Should be subclass of
-            scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
-            first k dimensions are used for lintsampling, while last dimension is
-            used for cell choice (this happens even if only one cell is given).
-            Default is None. In that case, if qmc is True, then a scrambled Sobol
-            sequence is used.
+        ----------        
+        seed : {None, int, ``numpy.random.Generator``}
+            See documentation for `seed` in class constructor.
+        qmc : bool
+            See documentation for `qmc` in class constructor.    
+        qmc_engine : {None, scipy.stats.qmc.QMCEngine}
+            See documentation for `qmc_engine` in class constructor.
 
         Returns
         -------
         None
-        
-        Attributes
-        ----------
-        qmc : boolean
-        qmc_engine : None or ``scipy`` QMCEngine, used if qmc is True
-        rng : ``numpy`` random generator, used if qmc is False
-
         """
         # store QMC flag as attribute
         self.qmc = qmc
@@ -374,7 +414,7 @@ class LintSampler:
         # set up numpy RNG; store as attribute
         self.rng = np.random.default_rng(seed)
         
-        # if using quasi-MC, configure qmc engine, else use numpy RNG
+        # if using quasi-MC, configure qmc engine
         if self.qmc:
             
             # default: scrambled Sobol
@@ -403,21 +443,33 @@ class LintSampler:
             else:
                 raise TypeError("qmc_engine must be QMCEngine instance or None")
 
-            # store attribute
-            self.qmc_engine = qmc_engine
+        # if qmc engine provided but QMC flag off, warn
         else:
-
-            # if qmc engine provided but QMC flag off, warn
             if qmc_engine is not None:
                 warnings.warn(
                     "LintSampler.__init__: " \
                     "provided qmc_engine won't be used as qmc switched off."
                 )
 
+        # set attribute
+        self.qmc_engine = qmc_engine
+
     def _generate_usamples(self, N):
-        """Generate uniform samples (N x dim + 1), either with RNG or QMC engine."""
+        """Generate array of uniform samples ~U(0,1).
+        
+        Parameters
+        ----------        
+        N : int
+            Number of uniform samples to draw.
+        
+        Returns
+        -------
+        u : array
+            2D array of uniform samples shaped (N, dim+1), where `dim` is
+            dimensionality of grid (see self.grid attribute).
+        """
         if self.qmc:
             u = self.qmc_engine.random(N)
         else:
             u = self.rng.random((N, self.dim + 1))
-        return u        
+        return u

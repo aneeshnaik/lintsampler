@@ -41,18 +41,18 @@ class DensityGrid:
     densities_evaluated : bool
         Flag indicating whether density function has been evaluated on grid (via
         `evaluate` method) yet. 
-    vertex_densities : None or numpy array
+    vertex_densities : {None, numpy array}
         If `densities_evaluated`, k-dimensional array giving densities at
         vertices of grid. Shape is equal to `edgeshape` attribute, i.e.
         (N0+1, N1+1, ...) if grid has shape (N0, N1, ...). None if not 
         `densities_evaluated`.
-    masses : None or numpy array
+    masses : {None, numpy array}
         If `densities_evaluated`, k-dimensional array of probability masses of
         grid cells. Shape is equal to grid shape (see `shape` attribute). Masses
         are calculated according to trapezoid rule, i.e., cell volumes
         multiplied by average vertex densities. None if not 
         `densities_evaluated`.
-    total_mass : None or float
+    total_mass : {None, float}
         If `densities_evaluated`, total probability mass of this grid; sum over
         `masses` array. None if not `densities_evaluated`.
 
@@ -120,7 +120,10 @@ class DensityGrid:
 
     def reset_densities(self):
         """Unset density flag and remove density-related attributes.
-        
+
+        Returns
+        -------
+        None
         """
         self.densities_evaluated = False
         self.vertex_densities = None
@@ -151,8 +154,14 @@ class DensityGrid:
         pdf_kwargs : dict, optional
             Additional keyword arguments to pass to pdf function; function call
             is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict
-            (no additional keyword arguments).            
+            (no additional keyword arguments).
+        
+        Returns
+        -------
+        None
         """
+        #TODO: raise error if densities already evaluated
+
         # number of vertices in grid
         npts = np.prod(self.edgeshape)
         
