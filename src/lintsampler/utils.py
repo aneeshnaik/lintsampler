@@ -7,6 +7,25 @@ def _is_1D_iterable(arr):
     return hasattr(arr, "__len__") and not hasattr(arr[0], "__len__")
 
 
+def _all_are_instances(iterable, type):
+    """Check if all elements in an iterable are instances of specified type.
+
+    Parameters
+    ----------
+    iterable : iterable
+        The iterable whose elements are to be checked.
+    type : type
+        The type against which each element in the iterable is checked.
+
+    Returns
+    -------
+    bool
+        True if all elements in the iterable are instances of specified type,
+        False otherwise.
+    """
+    return all([isinstance(item, type) for item in iterable])
+
+
 def _check_hyperbox_overlap(A_mins, A_maxs, B_mins, B_maxs):
     """
     Test whether two hyperboxes A and B overlap.

@@ -63,14 +63,6 @@ def _unitsample_kd(*f, u):
         Batch of samples from k-linear interpolant. If input densities were
 
     """    
-    # if densities scalar, pass to unbatched function
-    #if not hasattr(f[0], "__len__"):
-    #    return _unitsample_kd_single(*f, u=u[0])
-    
-    # if densities scalar, cast into length-1 arrays
-    if not hasattr(f[0], "__len__"):
-        f = [np.array([fi]) for fi in f]
-
     # infer dimensionality and batch size
     k = int(log2(len(f)))
     N = len(f[0])

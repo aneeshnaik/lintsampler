@@ -1,4 +1,5 @@
-# TODO: input premade Grid instance
+# TODO: input premade Grid instance (not evaluated)
+# TODO: input premade Grid instance (pre-evaluated)
 # TODO: Grid test suite
 # TODO: test example of single-cell grid(s)
 
@@ -128,7 +129,7 @@ def nonfinite_kD_pdf_nonvec(x):
 def test_f_negative(pdf, cells, vectorizedpdf):
     """Test error raised if f negative anywhere"""
     with pytest.raises(ValueError):
-        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
+        LintSampler(cells=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
 
 
 @pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
@@ -140,7 +141,7 @@ def test_f_negative(pdf, cells, vectorizedpdf):
 def test_f_nonfinite(pdf, cells, vectorizedpdf):
     """Test error raised if f non-finite anywhere"""
     with pytest.raises(ValueError):
-        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
+        LintSampler(cells=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
 
 
 @pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
@@ -154,7 +155,7 @@ def test_f_nonfinite(pdf, cells, vectorizedpdf):
 def test_f_bad_shape(pdf, cells, vectorizedpdf):
     """Test error raised if f returns inappropriate shape"""
     with pytest.raises(ValueError):
-        LintSampler(pdf=pdf, cells=cells, vectorizedpdf=vectorizedpdf)
+        LintSampler(cells=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
 
 
 ## INPUT CHECKING: SEED ########################################################
@@ -163,7 +164,7 @@ def test_f_bad_shape(pdf, cells, vectorizedpdf):
 def test_bad_seed():
     """Test that providing a nonsensical 'seed' raises an error."""
     with pytest.raises(TypeError):
-        LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, seed=42.5)
+        LintSampler(cells=X_EDGES, pdf=norm.pdf, vectorizedpdf=True, seed=42.5)
 
 
 ## INPUT CHECKING: N_SAMPLES ###################################################
@@ -171,7 +172,7 @@ def test_bad_seed():
 
 def test_nonint_N_samples():
     """Test that providing a non-integer N_samples raises an error."""
-    sampler = LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, seed=42)
+    sampler = LintSampler(cells=X_EDGES, pdf=norm.pdf, vectorizedpdf=True, seed=42)
     with pytest.raises(TypeError):
         sampler.sample(N_samples=10.0)
 
@@ -179,7 +180,7 @@ def test_nonint_N_samples():
 @pytest.mark.parametrize("N_samples", [0, -5])
 def test_bad_N_samples(N_samples):
     """Test that providing zero, or negative N_samples raises error."""
-    sampler = LintSampler(norm.pdf, X_EDGES, vectorizedpdf=True, seed=42)
+    sampler = LintSampler(cells=X_EDGES, pdf=norm.pdf, vectorizedpdf=True, seed=42)
     with pytest.raises(ValueError):
         sampler.sample(N_samples=N_samples)
 
@@ -187,7 +188,7 @@ def test_bad_N_samples(N_samples):
 def test_non_power2_sobol_warning():
     """Test warning raised if using Sobol sampler with non-power of 2."""
     with pytest.warns(UserWarning):
-        sampler = LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True)
+        sampler = LintSampler(cells=X_EDGES, pdf=norm.pdf, vectorizedpdf=True, qmc=True)
         sampler.sample(N_samples=10)
 
 
@@ -197,7 +198,7 @@ def test_non_power2_sobol_warning():
 def test_1D_edges_non_monotonic(cells):
     """Test error raised if 1D edges not monotonic"""
     with pytest.raises(ValueError):
-        LintSampler(norm.pdf, cells)
+        LintSampler(cells=cells, pdf=norm.pdf)
 
 
 @pytest.mark.parametrize("cells", NON_MONOTONIC_CELLS_2D)
@@ -205,14 +206,14 @@ def test_kD_edges_non_monotonic(cells):
     """Test error raised if 2D edges not monotonic"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
     with pytest.raises(ValueError):
-        LintSampler(dist.pdf, cells)
+        LintSampler(cells=cells, pdf=dist.pdf)
 
 
 @pytest.mark.parametrize("cells", NON_FINITE_CELLS_1D)
 def test_1D_edges_non_finite(cells):
     """Test error raised if 1D cells contain non-finite values (NaN/inf etc)"""
     with pytest.raises(ValueError):
-        LintSampler(norm.pdf, cells)
+        LintSampler(cells=cells, pdf=norm.pdf)
 
 
 @pytest.mark.parametrize("cells", NON_FINITE_CELLS_2D)
@@ -220,14 +221,14 @@ def test_kD_edges_non_finite(cells):
     """Test error raised if 2D cells contain non-finite values (NaN/inf etc)"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
     with pytest.raises(ValueError):
-        LintSampler(dist.pdf, cells)
+        LintSampler(cells=cells, pdf=dist.pdf)
 
 
 def test_1D_edges_overlapping():
     """Test error raised if distinct 1D grids are overlapping"""
     cells = [np.array([1.9, 2.4, 2.9]), np.array([1.0, 1.5, 2.0])]
     with pytest.raises(ValueError):
-        LintSampler(norm.pdf, cells)
+        LintSampler(cells=cells, pdf=norm.pdf)
 
 
 @pytest.mark.parametrize("cells", OVERLAPPING_CELLS_2D)
@@ -235,7 +236,7 @@ def test_kD_edges_overlapping(cells):
     """Test error raised if distinct kD grids are overlapping"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
     with pytest.raises(ValueError):
-        LintSampler(dist.pdf, cells)
+        LintSampler(cells=cells, pdf=dist.pdf)
 
 
 @pytest.mark.parametrize("cells", MISMATCHED_CELLS_2D)
@@ -243,14 +244,14 @@ def test_kD_mismatched_dims(cells):
     """Test error raised if distinct kD grids have mismatched dimensions"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
     with pytest.raises(ValueError):
-        LintSampler(dist.pdf, cells)
+        LintSampler(cells=cells, pdf=dist.pdf)
 
 
 @pytest.mark.parametrize("cells", NONSENSICAL_CELLS)
 def test_nonsensical_cells(cells):
     """Test error raised if cells are nonsensical types"""
     with pytest.raises(TypeError):
-        LintSampler(norm.pdf, cells)
+        LintSampler(cells=cells, pdf=norm.pdf)
 
 
 ## INPUT CHECKING: QMC #########################################################
@@ -266,28 +267,28 @@ def test_nonsensical_cells(cells):
 def test_wrong_qmc_dimension(qmc_engine):
     """Test error raised if dimension of user-provided QMC engine is wrong."""
     with pytest.raises(ValueError):
-        LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
+        LintSampler(cells=X_EDGES, pdf=norm.pdf, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
 
 
 @pytest.mark.parametrize("qmc_engine", [123.45, np.random.default_rng()])
 def test_wrong_qmc(qmc_engine):
     """Test error raised if user-provided QMC engine is not scipy QMC engine."""
     with pytest.raises(TypeError):
-        LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
+        LintSampler(cells=X_EDGES, pdf=norm.pdf, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
 
 
 def test_qmc_flag_engine_warning():
     """Test warning raised if user-provided qmc engine while qmc flag False"""
     engine = Sobol(d=2, scramble=True, seed=42)
     with pytest.warns(UserWarning):
-        LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=False, qmc_engine=engine)
+        LintSampler(cells=X_EDGES, pdf=norm.pdf, vectorizedpdf=True, qmc=False, qmc_engine=engine)
 
 
 def test_qmc_seed_warning():
     """Test warning raised if user-provided qmc engine while seed also given"""
     engine = Sobol(d=2, scramble=True, seed=42)
     with pytest.warns(UserWarning):
-        LintSampler(norm.pdf, cells=X_EDGES, vectorizedpdf=True, qmc=True, qmc_engine=engine, seed=42)
+        LintSampler(cells=X_EDGES, pdf=norm.pdf,vectorizedpdf=True, qmc=True, qmc_engine=engine, seed=42)
 
 
 ## OUTPUT SHAPES ###############################################################
@@ -299,7 +300,7 @@ def test_qmc_seed_warning():
 @pytest.mark.parametrize("qmc", [True, False])
 def test_1D_output_shapes(cells, N_samples, vectorizedpdf, qmc):
     """Single sample in 1D -> float, multiple samples -> 1D array"""
-    sampler = LintSampler(norm.pdf, cells, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
+    sampler = LintSampler(cells=cells, pdf=norm.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
     x = sampler.sample(N_samples=N_samples)
     if N_samples is None:
         assert isinstance(x, float)
@@ -314,7 +315,7 @@ def test_1D_output_shapes(cells, N_samples, vectorizedpdf, qmc):
 def test_kD_output_shapes(cells, N_samples, vectorizedpdf, qmc):
     """Single sample in kD -> k-vector, multiple samples -> 2D array (N, k)"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    sampler = LintSampler(dist.pdf, cells, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
+    sampler = LintSampler(cells=cells, pdf=dist.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, seed=42)
     x = sampler.sample(N_samples=N_samples)
     if N_samples is None:
         assert x.shape == (2,)
@@ -330,8 +331,8 @@ def test_kD_output_shapes(cells, N_samples, vectorizedpdf, qmc):
 def test_same_int_seed(N_samples, qmc):
     """Test same RNG seed (specified as int) produces same results."""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    sampler1 = LintSampler(dist.pdf, (X_EDGES, Y_EDGES), vectorizedpdf=True, qmc=qmc, seed=42)
-    sampler2 = LintSampler(dist.pdf, (X_EDGES, Y_EDGES), vectorizedpdf=True, qmc=qmc, seed=42)
+    sampler1 = LintSampler(cells=(X_EDGES, Y_EDGES), pdf=dist.pdf, vectorizedpdf=True, qmc=qmc, seed=42)
+    sampler2 = LintSampler(cells=(X_EDGES, Y_EDGES), pdf=dist.pdf, vectorizedpdf=True, qmc=qmc, seed=42)
     x1 = sampler1.sample(N_samples=N_samples)
     x2 = sampler2.sample(N_samples=N_samples)
     assert np.all(x1==x2)
@@ -342,8 +343,8 @@ def test_same_int_seed(N_samples, qmc):
 def test_same_rng_seed(N_samples, qmc):
     """Test same RNG seed (specified as numpy rng) produces same results."""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    sampler1 = LintSampler(dist.pdf, (X_EDGES, Y_EDGES), vectorizedpdf=True, qmc=qmc, seed=np.random.default_rng(42))
-    sampler2 = LintSampler(dist.pdf, (X_EDGES, Y_EDGES), vectorizedpdf=True, qmc=qmc, seed=np.random.default_rng(42))
+    sampler1 = LintSampler(cells=(X_EDGES, Y_EDGES), pdf=dist.pdf, vectorizedpdf=True, qmc=qmc, seed=np.random.default_rng(42))
+    sampler2 = LintSampler(cells=(X_EDGES, Y_EDGES), pdf=dist.pdf, vectorizedpdf=True, qmc=qmc, seed=np.random.default_rng(42))
     x1 = sampler1.sample(N_samples=N_samples)
     x2 = sampler2.sample(N_samples=N_samples)
     assert np.all(x1==x2)
@@ -353,7 +354,7 @@ def test_same_rng_seed(N_samples, qmc):
 def test_qmc_engine_reset(qmc_engine):
     """Test same same results after resetting QMC engine."""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    sampler = LintSampler(dist.pdf, (X_EDGES, Y_EDGES), vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
+    sampler = LintSampler(cells=(X_EDGES, Y_EDGES), pdf=dist.pdf, vectorizedpdf=True, qmc=True, qmc_engine=qmc_engine)
     x1 = sampler.sample()
     qmc_engine.reset()
     x2 = sampler.sample()
@@ -368,7 +369,7 @@ def test_1D_uniform(qmc):
     """Test that batch of uniform samples gives flat histogram."""
     cells = np.array([15.0, 25.0])
     uniform_pdf = lambda x: np.ones_like(x)
-    sampler = LintSampler(uniform_pdf, cells=cells, vectorizedpdf=True, qmc=qmc)
+    sampler = LintSampler(cells=cells, pdf=uniform_pdf, vectorizedpdf=True, qmc=qmc)
     x = sampler.sample(N_samples=2**17)
     p = np.histogram(x, np.linspace(15, 25, 11), density=True)[0]
     assert np.all(np.round(p, decimals=1) == 0.1)
@@ -382,7 +383,7 @@ def test_1D_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     mu_true = -2.0
     sig_true = 1.8
     d = norm(loc=mu_true, scale=sig_true)
-    sampler = LintSampler(d.pdf, cells, vectorizedpdf=vectorizedpdf, qmc=qmc, qmc_engine=qmc_engine)
+    sampler = LintSampler(cells=cells, pdf=d.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, qmc_engine=qmc_engine)
     x = sampler.sample(N_samples=2**17)
     mu = np.round(np.mean(x), decimals=0)
     sig = np.round(np.std(x), decimals=1)
@@ -401,7 +402,7 @@ def test_kD_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     ])
     dist = multivariate_normal(mean=mu_true, cov=cov_true)
 
-    sampler = LintSampler(dist.pdf, cells=cells, vectorizedpdf=vectorizedpdf, qmc=qmc, qmc_engine=qmc_engine)
+    sampler = LintSampler(cells=cells, pdf=dist.pdf, vectorizedpdf=vectorizedpdf, qmc=qmc, qmc_engine=qmc_engine)
     x = sampler.sample(N_samples=2**18)
 
     mu = np.round(np.mean(x, axis=0), decimals=1)
@@ -421,7 +422,7 @@ def test_kD_gaussian_reset():
     c1 = (X_EDGES, Y_EDGES)
     c2 = [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES), (X1_EDGES, Y0_EDGES), (X1_EDGES, Y1_EDGES)]
     
-    sampler = LintSampler(dist.pdf, cells=c1, vectorizedpdf=True)
+    sampler = LintSampler(cells=c1, pdf=dist.pdf, vectorizedpdf=True)
     x = sampler.sample(N_samples=2**18)
     sampler.reset_grid(cells=c2)
     x = sampler.sample(N_samples=2**18)
@@ -441,7 +442,7 @@ def test_kD_gaussian_args(vectorizedpdf):
     ])
     
     cells = (X_EDGES, Y_EDGES)
-    sampler = LintSampler(multivariate_normal.pdf, cells=cells, vectorizedpdf=vectorizedpdf, pdf_args=(mu_true, cov_true))
+    sampler = LintSampler(cells=cells, pdf=multivariate_normal.pdf, vectorizedpdf=vectorizedpdf, pdf_args=(mu_true, cov_true))
     x = sampler.sample(N_samples=2**18)
     
     mu = np.round(np.mean(x, axis=0), decimals=1)
@@ -460,7 +461,7 @@ def test_kD_gaussian_kwargs(vectorizedpdf):
     
     cells = (X_EDGES, Y_EDGES)
     kwargs = {'mean': mu_true, 'cov': cov_true}
-    sampler = LintSampler(multivariate_normal.pdf, cells=cells, vectorizedpdf=vectorizedpdf, pdf_kwargs=kwargs)
+    sampler = LintSampler(cells=cells, pdf=multivariate_normal.pdf, vectorizedpdf=vectorizedpdf, pdf_kwargs=kwargs)
     x = sampler.sample(N_samples=2**18)
     
     mu = np.round(np.mean(x, axis=0), decimals=1)
@@ -491,7 +492,7 @@ def test_1D_GMM(qmc):
     cells = [ga, gb]
     
     # draw samples
-    sampler = LintSampler(pdf=pdf, cells=cells, vectorizedpdf=True, qmc=qmc)
+    sampler = LintSampler(cells=cells, pdf=pdf, vectorizedpdf=True, qmc=qmc)
     x = sampler.sample(2**17)
 
     # find particles corresponding to each Gaussian, get sample stats
@@ -542,7 +543,7 @@ def test_2D_GMM(qmc):
     cells = [(ea, ea), (eb, eb)]
     
     # draw samples
-    sampler = LintSampler(pdf, cells=cells, vectorizedpdf=True, qmc=qmc)
+    sampler = LintSampler(cells=cells, pdf=pdf, vectorizedpdf=True, qmc=qmc)
     x = sampler.sample(N_samples=2**18)
     
     # find particles corresponding to each Gaussian, get sample stats

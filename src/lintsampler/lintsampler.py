@@ -1,8 +1,8 @@
 import numpy as np
 import warnings
 from scipy.stats.qmc import QMCEngine, Sobol
-from .grid import SamplingGrid
-from .utils import _check_N_samples, _is_1D_iterable, _choice, _check_hyperbox_overlap
+from .grid import DensityGrid
+from .utils import _check_N_samples, _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
 from .sampling import _grid_sample
 
 
@@ -68,9 +68,9 @@ class LintSampler:
     """
 
     def __init__(
-        self, pdf, cells,
-        seed=None, vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
-        qmc=False, qmc_engine=None
+        self, cells,
+        pdf=None, vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
+        seed=None, qmc=False, qmc_engine=None
     ):
         """Initialise a LintSampler instance.
 
@@ -128,9 +128,211 @@ class LintSampler:
         # set up the sampling grid under the hood
         self._set_grids(cells=cells)
         
+        # if given, evaluate PDF on grids, else check grids already evaluated
+        if self.pdf:
+            self._evaluate_pdf()
+        else:
+            self._check_grids_evaluated()
+        
         # configure random state according to given random seed and QMC params
         self._set_random_state(seed, qmc, qmc_engine)
+
+    def sample(self, N_samples=None):
+        """Draw samples from the pdf on the constructed grid(s).
+        
+        This function then draws a sample (or N samples) from the specified grid. It first chooses a cell 
+        (or N cells with replacement), weighting them by their mass (estimated by the trapezoid rule) 
+        then samples from k-linear interpolant within the chosen cell(s).
+        
+        Parameters
+        ----------
+        self : LintSampler
+            The LintSampler instance.
+        N_samples : {None, int}, optional
+            Number of samples to draw. Default is None, in which case a single
+            sample is drawn.
+        funcargs : optional
+            A tuple of optional arguments to be passed directly to the pdf function call.
+
+        Returns
+        -------
+        X : scalar, 1D array (length k OR N_samples) or 2D array (N_samples, k)
+            Sample(s) from linear interpolant. Scalar if single sample (i.e.,
+            N_samples is None) in 1D. 1D array if single sample in k-D OR multiple
+            samples in 1D. 2D array if multiple samples in k-D.
+        
+        """
+        _check_N_samples(N_samples)
+
+        # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
+        # first k dims used for lintsampling, last dim used for cell choice
+        if N_samples:
+            u = self._generate_usamples(N_samples)
+        else:
+            u = self._generate_usamples(1)
+        
+        # check that the function can be evaluated at the passed-in points (i.e. needs to take the dimensions as an argument)
+        #if self.eval_type == 'gridsample':
+        if self.ngrids == 1:
+
+            # call the gridded sampler
+            X = _grid_sample(self.grids[0], u)
+
+        else:
+            grid_masses = np.array([g.total_mass for g in self.grids])
+            p = grid_masses / grid_masses.sum()
+
+            grid_choice, cdf = _choice(p, u[:, -1], return_cdf=True)
+            cdf = np.append(0, cdf)
+            starts = cdf[:-1]
+            ends = cdf[1:]
+            X = np.empty((0, self.dim))
+            for i in range(self.ngrids):
+                m = grid_choice == i
+                if m.any():
+                    usub = u[grid_choice == i]
+                    usub[:, -1] = (usub[:, -1] - starts[i]) / (ends[i] - starts[i])
+                    X = np.vstack((X, _grid_sample(self.grids[i], usub)))
+
+        # final shuffle (important if using QMC with multiple grids)
+        if N_samples:
+            self.rng.shuffle(X, axis=0)
+
+        # squeeze down to scalar / 1D if appropriate
+        if not N_samples and (self.dim == 1):
+            X = X.item()
+        elif not N_samples:
+            X = X[0]
+        elif (self.dim == 1):
+            X = X.squeeze()
+
+        return X
+
+    def reset_grid(self, cells):
+        """Reset the sampling grid(s) without changing the pdf.
+        
+        Parameters
+        ----------
+        self : LintSampler
+            The LintSampler instance.
+
+        Returns
+        -------
+        combinations: numpy array
+            All possible combinations of starting and ending points for the
+            inferred dimensionality of the problem.
+                
+        """
+        # reset grid(s)
+        self._set_grids(cells=cells)
+        
+        # evaluate PDF on new grids / check grids already evaluated
+        if self.pdf:
+            self._evaluate_pdf()
+        else:
+            self._check_grids_evaluated()
+
+    def _set_grids(self, cells):
+        """Construct the cells for sampling.
+
+        Parameters
+        ----------
+        self : LintSampler
+            The LintSampler instance.
+        cells : single array, tuple of arrays or list of tuples of arrays
+            If a single array, the boundary values for a 1D grid. If a tuple of arrays, the
+            boundary values for a grid with dimensionality of the length of the tuple. If
+            a list of tuples of arrays, the boundary values for an arbitrary number of
+            grids with dimensionality the length of the tuples.
+
+        Returns
+        -------
+        None
+        
+        Attributes
+        -------
+        eval_type : string
+            The evaluation type, either 'gridsample' or 'freesample'
+        dim : int
+            The inferred dimensionality of the problem
+        edgearrays : list of numpy arrays
+            The arrays defining the edge of the grids
+        edgedims   : tuple of integers, optional, used if eval_type == 'gridsample'
+            The shape of the gridsample grid
+        ngrids : integer, optional, used if eval_type == 'freesample'
+            The number of distinct grids to be constructed
+        gridshape : list of tuple of integers, optional, used if eval_type == 'freesample'
+            The shape of each distinct grid
+        ngridentries : list of integers, optional, used if eval_type == 'freesample'
+            The number of entries in the 
+        nedgegridentries : list of integers, optional, used if eval_type == 'freesample'
+            The number of entries in the offset grids
+        x0 : list of numpy arrays, optional, used if eval_type == 'freesample'
+            The array of the first vertex of the grids
+        x1 : list of numpy arrays, optional, used if eval_type == 'freesample'
+            The array of the last vertex of the grids
+        """
+
+        # cells cases:
+        # - cells is a single pre-made density grid
+        # - cells is a list of ditto
+        # - cells is a list of: 1D iterables or tuples of 1D iterables
+        # - cells is a single 1D iterable / tuple of 1D iterables
+        if isinstance(cells, DensityGrid):
+            self.ngrids = 1
+            self.grids = [cells]
+        elif isinstance(cells, list) and _all_are_instances(cells, DensityGrid):
+            self.ngrids = len(cells)
+            self.grids = cells
+        elif isinstance(cells, list) and not _is_1D_iterable(cells):
+            self.ngrids = len(cells)
+            self.grids = [DensityGrid(cells=ci) for ci in cells]
+        else:
+            self.ngrids = 1
+            self.grids = [DensityGrid(cells=cells)]
+
+        # get dimensionality of problem from first grid
+        self.dim = self.grids[0].dim
+
+        # check that all grids have same dimension 
+        for grid in self.grids[1:]:
+            if grid.dim != self.dim:
+                d1 = grid.dim
+                d2 = self.dim
+                raise ValueError(
+                    f"LintSampler._set_grids: "\
+                    "Grids have mismatched dimensions: {d1} and {d2}"
+                )
     
+        # loop over grid pairs and check no overlap
+        for i in range(self.ngrids - 1):
+            for j in range(i + 1, self.ngrids):
+                overlap = _check_hyperbox_overlap(
+                    self.grids[i].mins, self.grids[i].maxs,
+                    self.grids[j].mins, self.grids[j].maxs,
+                )
+                if overlap:
+                    raise ValueError(
+                        "LintSampler._set_grids: " \
+                        f"Grids {i} and {j} spatially overlapping."
+                    )
+
+    def _evaluate_pdf(self):
+        # TODO: docstring
+        for grid in self.grids:
+            grid.evaluate(
+                self.pdf, self.vectorizedpdf, self.pdf_args, self.pdf_kwargs
+            )
+            
+    def _check_grids_evaluated(self):
+        # TODO: docstring
+        for grid in self.grids:
+            if not grid.densities_evaluated:
+                raise ValueError(
+                    "LintSampler._check_grids_evaluated: " \
+                    f"No densities pre-evaluated on grids and no PDF provided."
+                )
+
     def _set_random_state(self, seed, qmc, qmc_engine):
         """Parse QMC-related parameters and set as attributes.
         
@@ -219,164 +421,3 @@ class LintSampler:
         else:
             u = self.rng.random((N, self.dim + 1))
         return u        
-
-    def sample(self, N_samples=None):
-        """Draw samples from the pdf on the constructed grid(s).
-        
-        This function then draws a sample (or N samples) from the specified grid. It first chooses a cell 
-        (or N cells with replacement), weighting them by their mass (estimated by the trapezoid rule) 
-        then samples from k-linear interpolant within the chosen cell(s).
-        
-        Parameters
-        ----------
-        self : LintSampler
-            The LintSampler instance.
-        N_samples : {None, int}, optional
-            Number of samples to draw. Default is None, in which case a single
-            sample is drawn.
-        funcargs : optional
-            A tuple of optional arguments to be passed directly to the pdf function call.
-
-        Returns
-        -------
-        X : scalar, 1D array (length k OR N_samples) or 2D array (N_samples, k)
-            Sample(s) from linear interpolant. Scalar if single sample (i.e.,
-            N_samples is None) in 1D. 1D array if single sample in k-D OR multiple
-            samples in 1D. 2D array if multiple samples in k-D.
-        
-        """
-        _check_N_samples(N_samples)
-
-        # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
-        # first k dims used for lintsampling, last dim used for cell choice
-        if N_samples:
-            u = self._generate_usamples(N_samples)
-        else:
-            u = self._generate_usamples(1)
-        
-        # check that the function can be evaluated at the passed-in points (i.e. needs to take the dimensions as an argument)
-        #if self.eval_type == 'gridsample':
-        if self.ngrids == 1:
-
-            # call the gridded sampler
-            X = _grid_sample(self.grids[0], u)
-
-        else:
-            grid_masses = np.array([g.total_mass for g in self.grids])
-            p = grid_masses / grid_masses.sum()
-
-            grid_choice, cdf = _choice(p, u[:, -1], return_cdf=True)
-            cdf = np.append(0, cdf)
-            starts = cdf[:-1]
-            ends = cdf[1:]
-            X = np.empty((0, self.dim))
-            for i in range(self.ngrids):
-                m = grid_choice == i
-                if m.any():
-                    usub = u[grid_choice == i]
-                    usub[:, -1] = (usub[:, -1] - starts[i]) / (ends[i] - starts[i])
-                    X = np.vstack((X, _grid_sample(self.grids[i], usub)))
-
-        # final shuffle (important if using QMC with multiple grids)
-        if N_samples:
-            self.rng.shuffle(X, axis=0)
-
-        # squeeze down to scalar / 1D if appropriate
-        if not N_samples and (self.dim == 1):
-            X = X.item()
-        elif not N_samples:
-            X = X[0]
-        elif (self.dim == 1):
-            X = X.squeeze()
-
-        return X
-
-    def reset_grid(self, cells):
-        """Reset the sampling grid(s) without changing the pdf.
-        
-        Parameters
-        ----------
-        self : LintSampler
-            The LintSampler instance.
-
-        Returns
-        -------
-        combinations: numpy array
-            All possible combinations of starting and ending points for the
-            inferred dimensionality of the problem.
-                
-        """
-        self._set_grids(cells=cells)
-
-    def _set_grids(self, cells):
-        """Construct the cells for sampling.
-
-        Parameters
-        ----------
-        self : LintSampler
-            The LintSampler instance.
-        cells : single array, tuple of arrays or list of tuples of arrays
-            If a single array, the boundary values for a 1D grid. If a tuple of arrays, the
-            boundary values for a grid with dimensionality of the length of the tuple. If
-            a list of tuples of arrays, the boundary values for an arbitrary number of
-            grids with dimensionality the length of the tuples.
-
-        Returns
-        -------
-        None
-        
-        Attributes
-        -------
-        eval_type : string
-            The evaluation type, either 'gridsample' or 'freesample'
-        dim : int
-            The inferred dimensionality of the problem
-        edgearrays : list of numpy arrays
-            The arrays defining the edge of the grids
-        edgedims   : tuple of integers, optional, used if eval_type == 'gridsample'
-            The shape of the gridsample grid
-        ngrids : integer, optional, used if eval_type == 'freesample'
-            The number of distinct grids to be constructed
-        gridshape : list of tuple of integers, optional, used if eval_type == 'freesample'
-            The shape of each distinct grid
-        ngridentries : list of integers, optional, used if eval_type == 'freesample'
-            The number of entries in the 
-        nedgegridentries : list of integers, optional, used if eval_type == 'freesample'
-            The number of entries in the offset grids
-        x0 : list of numpy arrays, optional, used if eval_type == 'freesample'
-            The array of the first vertex of the grids
-        x1 : list of numpy arrays, optional, used if eval_type == 'freesample'
-            The array of the last vertex of the grids
-
-        
-        """
-        
-        # if cells is a non-1D list, then multiple grids, otherwise 1 grid
-        gargs = {
-            'pdf': self.pdf,
-            'vectorizedpdf': self.vectorizedpdf,
-            'pdf_args': self.pdf_args,
-            'pdf_kwargs': self.pdf_kwargs,
-        }
-        if isinstance(cells, list) and not _is_1D_iterable(cells):
-            self.ngrids = len(cells)
-            self.grids = [SamplingGrid(cells=ci, **gargs) for ci in cells]
-        else:
-            self.ngrids = 1
-            self.grids = [SamplingGrid(cells=cells, **gargs)]
-        self.dim = self.grids[0].dim
-    
-        # loop over grid pairs and check no overlap
-        for i in range(self.ngrids - 1):
-            for j in range(i + 1, self.ngrids):
-                overlap = _check_hyperbox_overlap(
-                    self.grids[i].mins, self.grids[i].maxs,
-                    self.grids[j].mins, self.grids[j].maxs,
-                )
-                if overlap:
-                    raise ValueError(
-                        "LintSampler._set_grids: " \
-                        f"Grids {i} and {j} spatially overlapping."
-                    )
-
-        # TODO: test if grids have different dim

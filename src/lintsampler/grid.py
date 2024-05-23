@@ -3,20 +3,14 @@ from functools import reduce
 from .utils import _is_1D_iterable, _choice
 
 
-class SamplingGrid:
-    """Grid-like object handling all spatial logic.
+class DensityGrid:
+    """Grid-like object over which density function is evaluated.
 
     #TODO extended description
     #TODO: examples
 
     Parameters
     ----------
-    pdf : function
-        Probability density function from which to draw samples. Function should
-        take coordinate vector (or batch of coordinate vectors if vectorized;
-        see `vectorizedpdf` attribute below) and return (unnormalised)
-        probability density (or batch of densities). Additional arguments can
-        be passed to the function via `pdf_args` and `pdf_kwargs` parameters.
     cells : 1D iterable or tuple of 1D iterables
         If a single 1D iterable (i.e., array, tuple, list of numbers), then this
         represents the cell edges of a 1D grid. So a 1D grid with N cells should
@@ -25,31 +19,9 @@ class SamplingGrid:
         dimensionality equal to the length of the tuple. So, a kD grid with
         (N0 x N1 x ... x N{k-1}) cells should have a length-k tuple, with arrays
         length N0+1, N1+1 etc.
-    vectorizedpdf : bool, optional
-        if True, assumes that the pdf function is vectorized, i.e., it accepts 
-        (..., k)-shaped batches of coordinate vectors and returns (...)-shaped
-        batches of probability densities. If False, assumes that the pdf
-        function simply accepts (k,)-shaped coordinate vectors and returns
-        single densities. Default is False.
-    pdf_args : tuple, optional
-        Additional positional arguments to pass to pdf function; function call
-        is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty tuple (no
-        additional positional arguments).
-    pdf_kwargs : dict, optional
-        Additional keyword arguments to pass to pdf function; function call
-        is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict (no
-        additional keyword arguments).
 
     Attributes
     ----------
-    pdf : function
-        See corresponding parameter above.
-    vectorizedpdf : bool
-        See corresponding parameter above.
-    pdf_args : tuple
-        See corresponding parameter above.
-    pdf_kwargs : dict
-        See corresponding parameter above.
     dim : int
         Dimensionality of grid (referred to as "k" elsewhere in the docs).
     shape : tuple
@@ -57,7 +29,7 @@ class SamplingGrid:
         lengths N0+1, N1+1, ... N{k-1}+1, then `shape` is (N0, N1, ..., N{k-1}).
     edgearrays : list
         Length `dim` list of arrays of grid edges along each dimension.
-    edgedims : tuple
+    edgeshape : tuple
         Length `dim` tuple giving lengths of `edgearrays`. This is equal to
         `shape` tuple, but plus one to each element.
     mins : numpy array
@@ -66,33 +38,34 @@ class SamplingGrid:
     maxs : numpy array
         1D numpy array (length `dim`), giving upper coordinate bound of grid
         along each dimension.
-    vertex_densities : numpy array
-        k-dimensional array giving densities at vertices of grid. Shape is equal
-        to `edgedims` attribute above.
-    masses : numpy array
-        k-dimensional array of probability masses of grid cells. Shape is equal
-        to grid shape (see `shape` attribute above). Masses are calculated
-        according to trapezoid rule, i.e., cell volumes multiplied by average
-        vertex densities.
-    total_mass : float
-        Total probability mass of this grid; sum over `masses` array above.
+    densities_evaluated : bool
+        Flag indicating whether density function has been evaluated on grid (via
+        `evaluate` method) yet. 
+    vertex_densities : None or numpy array
+        If `densities_evaluated`, k-dimensional array giving densities at
+        vertices of grid. Shape is equal to `edgeshape` attribute, i.e.
+        (N0+1, N1+1, ...) if grid has shape (N0, N1, ...). None if not 
+        `densities_evaluated`.
+    masses : None or numpy array
+        If `densities_evaluated`, k-dimensional array of probability masses of
+        grid cells. Shape is equal to grid shape (see `shape` attribute). Masses
+        are calculated according to trapezoid rule, i.e., cell volumes
+        multiplied by average vertex densities. None if not 
+        `densities_evaluated`.
+    total_mass : None or float
+        If `densities_evaluated`, total probability mass of this grid; sum over
+        `masses` array. None if not `densities_evaluated`.
 
     Methods
     -------
+    evaluate(pdf, vectorizedpdf=False, pdf_args=(), pdf_kwargs={})
+        Evaluate given PDF on grid.
     choose(u)
         Given array of uniform (~U(0, 1)) samples, choose series of grid cells.
     get_cell_corner_densities(cells)
         Get densities at 2^k corners of given cells.
     """
-    def __init__(
-        self, pdf, cells,
-        vectorizedpdf=False, pdf_args=(), pdf_kwargs={}
-    ):
-        # store PDF and related parameters as attributes
-        self.pdf = pdf
-        self.vectorizedpdf = vectorizedpdf
-        self.pdf_args = pdf_args
-        self.pdf_kwargs = pdf_kwargs
+    def __init__(self, cells):
         
         # 1D case: cells is 1D iterable (array, tuple, list)
         # e.g. cells = np.linspace(-4,4,50)
@@ -101,7 +74,7 @@ class SamplingGrid:
             # store dimensionality (1) and single edgearray and dims
             self.dim = 1
             self.edgearrays = [np.array(cells)]
-            self.edgedims = (len(cells),)
+            self.edgeshape = (len(cells),)
 
         # kD case: cells is tuple of 1D iterables
         # e.g. cells = (np.linspace(-12,12,100),np.linspace(-4,4,50))
@@ -112,10 +85,10 @@ class SamplingGrid:
 
             # loop over dimensions, store edge arrays and dims
             self.edgearrays = []
-            self.edgedims = ()
+            self.edgeshape = ()
             for d in range(0,self.dim):
                 self.edgearrays.append(np.array(cells[d]))
-                self.edgedims += (len(cells[d]),)
+                self.edgeshape += (len(cells[d]),)
         
         # cells type not recognised
         else:
@@ -137,13 +110,84 @@ class SamplingGrid:
                     "Grid.__init__: Edges not finite-valued."
                 )
 
+        # geometry-related attrs
         self.mins = np.array([arr[0] for arr in self.edgearrays])
         self.maxs = np.array([arr[-1] for arr in self.edgearrays])
-        self.vertex_densities = self._evaluate_pdf()
+        self.shape = tuple(d - 1 for d in self.edgeshape)
+
+        # density-related attrs (None because densities not yet evaluated)
+        self.reset_densities()
+
+    def reset_densities(self):
+        """Unset density flag and remove density-related attributes.
+        
+        """
+        self.densities_evaluated = False
+        self.vertex_densities = None
+        self.masses = None
+        self.total_mass = None
+
+    def evaluate(self, pdf, vectorizedpdf=False, pdf_args=(), pdf_kwargs={}):
+        """Evaluate the user-provided pdf on grid and set related attributes.
+        
+        Parameters
+        ----------
+        pdf : function
+            Probability density function to evaluate on grid. Function should
+            take coordinate vector (or batch of vectors if vectorized; see
+            `vectorizedpdf` parameter) and return (unnormalised) density (or
+            batch of densities). Additional arguments can be passed to the
+            function via `pdf_args` and `pdf_kwargs` parameters.
+        vectorizedpdf : bool, optional
+            if True, assumes that the pdf function is vectorized, i.e., it
+            accepts  (..., k)-shaped batches of coordinate vectors and returns
+            (...)-shaped batches of densities. If False, assumes that the pdf
+            function simply accepts (k,)-shaped coordinate vectors and returns
+            single densities. Default is False.
+        pdf_args : tuple, optional
+            Additional positional arguments to pass to pdf function; function
+            call is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty
+            tuple (no additional positional arguments).
+        pdf_kwargs : dict, optional
+            Additional keyword arguments to pass to pdf function; function call
+            is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict
+            (no additional keyword arguments).            
+        """
+        # number of vertices in grid
+        npts = np.prod(self.edgeshape)
+        
+        # create the flattened grid for evaluation in k>1 case
+        if self.dim > 1:
+            g = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1)
+            edgegrid = g.reshape(npts, self.dim)
+        else:
+            edgegrid = self.edgearrays[0]
+
+        # evaluate PDF over edge grid (iterate over grid if not vectorized)
+        if vectorizedpdf:
+            f = pdf(edgegrid, *pdf_args, **pdf_kwargs)
+            densities = np.array(f, dtype=np.float64)         
+        else:            
+            densities = np.zeros(npts, dtype=np.float64)
+            for pt in range(npts):
+                f = pdf(edgegrid[pt], *pdf_args, **pdf_kwargs)
+                densities[pt] = f
+
+        # check densities all non-negative and finite
+        if np.any(densities < 0):
+            raise ValueError("Grid._evaluate_pdf: Densities can't be negative")
+        if not np.all(np.isfinite(densities)):
+            raise ValueError("Grid._evaluate_pdf: Detected non-finite density")
+
+        # reshape densities to grid
+        densities = densities.reshape(self.edgeshape)
+
+        # store attributes
+        self.densities_evaluated = True
+        self.vertex_densities = densities
         self.masses = self._calculate_faverages() * self._calculate_volumes()
         self.total_mass = np.sum(self.masses)
-        self.shape = self.masses.shape
-    
+
     def choose(self, u):
         """Given 1D array of uniform samples, return indices of chosen cells.
         
@@ -196,39 +240,6 @@ class SamplingGrid:
             corners.append(self.vertex_densities[idx])
         return tuple(corners)
 
-    def _evaluate_pdf(self):
-        """Evaluate the user-provided pdf on the grid.
-        
-        Returns
-        -------
-        densities: array, k-dimensional, shape (N0+1 x N1+1 x ... x N{k-1}+1)
-            k-dimensional array of densities at the vertices of the grid.     
-        """
-        # create the flattened grid for evaluation in k>1 case
-        if self.dim > 1: 
-            edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(np.prod(self.edgedims), self.dim)
-        else:
-            edgegrid = self.edgearrays[0]
-
-        # evaluate PDF over edge grid (iterate over grid if not vectorized)
-        if self.vectorizedpdf:
-            densities = np.array(self.pdf(edgegrid, *self.pdf_args, **self.pdf_kwargs), dtype=np.float64)         
-        else:
-            npts = np.prod(self.edgedims)
-            densities = np.zeros(npts, dtype=np.float64)
-            for pt in range(npts):
-                densities[pt] = self.pdf(edgegrid[pt], *self.pdf_args, **self.pdf_kwargs)
-
-        # check densities all non-negative and finite
-        if np.any(densities < 0):
-            raise ValueError("Grid._evaluate_pdf: Densities can't be negative")
-        if not np.all(np.isfinite(densities)):
-            raise ValueError("Grid._evaluate_pdf: Detected non-finite density")
-
-        # reshape densities to grid
-        densities = densities.reshape(*self.edgedims)
-        return densities
-    
     def _calculate_faverages(self):
         """Calculate cell average densities.
         
