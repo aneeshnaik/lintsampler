@@ -4,7 +4,7 @@ from .utils import _multiply_array_slice, _choice
 
 
 def _unitsample_1d(f0, f1, u):
-    """Convert uniform samples to single 1D lintsamples on unit interval.
+    """Convert uniform samples to 1D lintsamples on unit interval.
     
     `f0` and `f1` are 1D numpy arrays length N, representing densities at x=0
     and x=1 respectively for N cells. `u` is also a 1D numpy array length N, 
@@ -40,28 +40,28 @@ def _unitsample_1d(f0, f1, u):
 
 def _unitsample_kd(*f, u):
     # TODO: check docstring (not dealing with scalars anymore)
-    """Batched sampling from linear interpolant in k-dimensional unit hypercube.
+    """Convert uniform samples to kD lintsamples in unit hypercube.
     
-    f is either a series of 2^k scalars or 2^k 1D numpy arrays, each length N,
-    representing the (not necessarily normalised) density values at the 2^k
-    corners of the k-dimensional unit hypercube (or batch of N such hypercubes).
-    A single sample is drawn from the k-linear interpolant between these
-    corners. This works by first 1D sampling from p(x0), then 1D sampling
-    from p(x1|x0), then p(x2|x0,x1), and so on until all k dimensions are
-    sampled.
+    f is either a series 2^k 1D numpy arrays, each length N, representing the
+    (not necessarily normalised) density values at the 2^k corners of a batch of
+    N k-dimensional unit hypercubes. A single sample is drawn from the k-linear
+    interpolant between these corners. This works by first 1D sampling from
+    p(x0), then 1D sampling from p(x1|x0), then p(x2|x0,x1), and so on until all
+    k dimensions are sampled.
 
     Parameters
     ----------
-    *f : 2^k scalars or 2^k 1D numpy arrays, length N
-        Densities at corners of k-d unit cube (or batch of N such cubes).
-    u : 1D numpy array, shape (k,) or 2D numpy array, shape (N, k)
-        Single (or N) k-dimensional uniform sample(s).
+    *f : 2^k 1D numpy arrays, length N
+        Densities at the 2^k corners of N k-dimensional unit cubes. Corners
+        should be ordered e.g., in 3D, (0, 0, 0), (0, 0, 1), (0, 1, 0), ...
+        (1, 1, 0), (1, 1, 1).
+    u : 2D numpy array, shape (N, k)
+        Batch of N k-dimensional uniform samples.
 
     Returns
     -------
     samples : 2D array, shape (N, k)
-        Batch of samples from k-linear interpolant. If input densities were
-
+        Batch of samples from k-linear interpolant.
     """    
     # infer dimensionality and batch size
     k = int(log2(len(f)))
@@ -96,9 +96,27 @@ def _unitsample_kd(*f, u):
 
 
 def _grid_sample(grid, u):
-    # TODO: docstring
-    # TODO: special case of grid with single cell
-    
+    """
+    Sample points from a DensityGrid instance using batch of uniform samples.
+
+    Parameters
+    ----------
+    grid : DensityGrid
+        An instance of the DensityGrid class, which defines the density
+        distribution and grid structure. The grid should already have densities
+        evaluated, i.e. grid.densities_evaluated should be True.
+    u : numpy array
+        A 2D array of shape (N, k+1) containing uniform samples. Each row
+        represents  a sample in the (k+1)-dimensional uniform sample; the
+        last dimension is used to choose a grid cell and the first k dimensions
+        are used for sampling within the chosen cell.
+
+    Returns
+    -------
+    z : ndarray
+        A 2D array of shape (N, k) containing the sampled points. Each row
+        represents a sampled point in k-dimensional space.
+    """
     # get indices of grid cells: 2D array (N, k)
     cells = grid.choose(u[..., -1])
 
