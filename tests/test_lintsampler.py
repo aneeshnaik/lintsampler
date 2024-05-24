@@ -1,5 +1,3 @@
-# TODO: test example of single-cell grid(s)
-
 import pytest
 import numpy as np
 from scipy.stats import norm, multivariate_normal

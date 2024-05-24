@@ -28,6 +28,8 @@ class DensityGrid:
     shape : tuple
         Length `dim` tuple giving grid shape. For example, if `edgearrays` are
         lengths N0+1, N1+1, ... N{k-1}+1, then `shape` is (N0, N1, ..., N{k-1}).
+    ncells : int
+        Total number of cells in grid, i.e., the product over the shape tuple.
     edgearrays : list
         Length `dim` list of arrays of grid edges along each dimension.
     edgeshape : tuple
@@ -115,6 +117,7 @@ class DensityGrid:
         self.mins = np.array([arr[0] for arr in self.edgearrays])
         self.maxs = np.array([arr[-1] for arr in self.edgearrays])
         self.shape = tuple(d - 1 for d in self.edgeshape)
+        self.ncells = np.prod(self.shape)
 
         # density-related attrs (None because densities not yet evaluated)
         self.reset_densities()
@@ -212,7 +215,10 @@ class DensityGrid:
         -------
         cells : 2D array of ints, shape (N, k)
             Grid indices of N chosen cells along the k dimensions of the grid.
-        """        
+        """
+        if self.ncells == 1:
+            return np.zeros((len(u), self.dim), dtype=np.int32)
+            
         # get flattened array of grid cell probs: 1D array (len: #gridcells)
         p = (self.masses / self.masses.sum()).flatten()
 
