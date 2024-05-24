@@ -39,7 +39,6 @@ def _unitsample_1d(f0, f1, u):
 
 
 def _unitsample_kd(*f, u):
-    # TODO: check docstring (not dealing with scalars anymore)
     """Convert uniform samples to kD lintsamples in unit hypercube.
     
     f is either a series 2^k 1D numpy arrays, each length N, representing the

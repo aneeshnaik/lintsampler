@@ -244,6 +244,14 @@ def test_kD_mismatched_dims(cells):
         LintSampler(cells=cells, pdf=dist.pdf)
 
 
+def test_kD_mismatched_types():
+    """Test error raised if distinct kD grids have mismatched types"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    cells = [(X0_EDGES, Y0_EDGES), DensityGrid((X0_EDGES, Y1_EDGES))]
+    with pytest.raises(TypeError):
+        LintSampler(cells=cells, pdf=dist.pdf)
+
+
 @pytest.mark.parametrize("cells", [
     1, np.random.default_rng(42),
     [[X0_EDGES, Y0_EDGES], [X0_EDGES, Y1_EDGES]],

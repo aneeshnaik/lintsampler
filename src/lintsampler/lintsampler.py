@@ -338,7 +338,12 @@ class LintSampler:
             self.ngrids = len(cells)
             self.grids = cells
         elif isinstance(cells, list) and not _is_1D_iterable(cells):
-            #TODO check all list members same type
+            # check all list items are same sort of thing
+            if not _all_are_instances(cells, type(cells[0])):
+                raise TypeError(
+                    "LintSampler._set_grids: "\
+                    f"List members of different types"
+                )
             self.ngrids = len(cells)
             self.grids = [DensityGrid(cells=ci) for ci in cells]
         else:
