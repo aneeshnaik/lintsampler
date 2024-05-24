@@ -15,10 +15,20 @@ The source code is a public repository on [GitHub](https://github.com/aneeshnaik
 
 installation
 usage
-sample
-gridsample
+lintsampler
+densitygrid
 attribution
 license
+```
+
+```{toctree}
+:caption: Examples
+:hidden: true
+:maxdepth: 1
+
+examples/1_gmm
+examples/2_doughnuts
+examples/3_dark_matter
 ```
 
 ```{toctree}
@@ -30,14 +40,4 @@ theory/preamble.md
 theory/inverse_sampling
 theory/linear_interpolant.md
 theory/worked_example.md
-```
-
-```{toctree}
-:caption: Examples
-:hidden: true
-:maxdepth: 1
-
-examples/1_gmm
-examples/2_doughnuts
-examples/3_dark_matter
 ```
