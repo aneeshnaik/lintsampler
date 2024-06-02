@@ -12,22 +12,28 @@ class DensityGrid:
 
     Parameters
     ----------
+    
     cells : 1D iterable or tuple of 1D iterables
         If a single 1D iterable (i.e., array, tuple, list of numbers), then this
-        represents the cell edges of a 1D grid. So a 1D grid with N cells should
-        have `cells` parameter as a 1D array with N+1 elements. If a tuple of 1D
-        iterables, then this represents the edges values for a grid with
-        dimensionality equal to the length of the tuple. So, a kD grid with
-        (N0 x N1 x ... x N{k-1}) cells should have a length-k tuple, with arrays
-        length N0+1, N1+1 etc.
+        represents the cell `edges` of a 1D grid. So a 1D grid with N cells
+        should have ``cells`` parameter as a 1D array with N+1 elements. If a
+        tuple of 1D iterables, then this represents the edges values for a 
+        k-dimensional grid with dimensionality equal to the length of the tuple.
+        So, a kD grid with (N0 x N1 x ... x N{k-1}) cells should take a length-k
+        tuple, with arrays length N0+1, N1+1 etc.
+
 
     Attributes
     ----------
+ 
     dim : int
-        Dimensionality of grid (referred to as "k" elsewhere in the docs).
+        Dimensionality of grid.
+ 
     shape : tuple
-        Length `dim` tuple giving grid shape. For example, if `edgearrays` are
-        lengths N0+1, N1+1, ... N{k-1}+1, then `shape` is (N0, N1, ..., N{k-1}).
+        ``dim``-length tuple giving grid shape. For example, if 
+        ``edgearrays`` have lengths N0+1, N1+1, ... N{k-1}+1, then ``shape`` is
+        (N0, N1, ..., N{k-1}).
+
     ncells : int
         Total number of cells in grid, i.e., the product over the shape tuple.
     edgearrays : list
@@ -58,15 +64,6 @@ class DensityGrid:
     total_mass : {None, float}
         If `densities_evaluated`, total probability mass of this grid; sum over
         `masses` array. None if not `densities_evaluated`.
-
-    Methods
-    -------
-    evaluate(pdf, vectorizedpdf=False, pdf_args=(), pdf_kwargs={})
-        Evaluate given PDF on grid.
-    choose(u)
-        Given array of uniform (~U(0, 1)) samples, choose series of grid cells.
-    get_cell_corner_densities(cells)
-        Get densities at 2^k corners of given cells.
     """
     def __init__(self, cells):
         

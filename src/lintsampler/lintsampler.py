@@ -14,98 +14,113 @@ class LintSampler:
 
     Parameters
     ----------
-    cells : iterable or `DensityGrid`
+    
+    cells : iterable or ``DensityGrid``
         Coordinate grid(s) to draw samples over. Several forms are available. If
         using a single coordinate grid, then `cells` can be any of:
+        
         - a 1D iterable (array, list, tuple) representing the cell edges of a 1D
-        grid. So, if the grid has N cells, then the iterable should have N+1
-        elements.
+          grid. So, if the grid has N cells, then the iterable should have N+1
+          elements.
         - a tuple of 1D iterables, representing the cell edges of a kD grid. If
-        the grid has (N1, N2, ..., Nk) cells, then the tuple should have length
-        k, and the 1D arrays in the tuple should have lengths N1+1, N2+1, ...,
-        Nk+1.
-        - a DensityGrid instance, either with densities pre-evaluated or not. If
-        densities are already evaluated, `pdf` parameter should not be set and
-        vice versa.
-        If using multiple (non-overlapping) coordinate grids, then `cells`
+          the grid has (N1, N2, ..., Nk) cells, then the tuple should have length
+          k, and the 1D arrays in the tuple should have lengths N1+1, N2+1, ...,
+          Nk+1.
+        - a ``DensityGrid`` instance, either with densities pre-evaluated or
+          not. If densities are already evaluated, ``pdf`` parameter should not
+          be set and vice versa.
+        
+        If using multiple (non-overlapping) coordinate grids, then ``cells``
         should be a list of any of the above. See the examples below for the
-        various usage patterns. 
-    pdf : {None, function}, optional
+        various usage patterns.
+    
+    pdf : {``None``, function}, optional
         Probability density function from which to draw samples. Function should
         take coordinate vector (or batch of vectors if vectorized; see
-        `vectorizedpdf` parameter) and return (unnormalised) density (or batch
+        ``vectorizedpdf`` parameter) and return (unnormalised) density (or batch
         of densities). Additional arguments can be passed to the function via
-        `pdf_args` and `pdf_kwargs` parameters. Default is None, in which case
-        it is assumed that `cells` comprises one instance or several instances
-        of `DensityGrid` already having the densities evaluated (i.e.,
-        `densities_evaluated=True`).
+        ``pdf_args`` and ``pdf_kwargs`` parameters. Default is ``None``, in
+        which case it is assumed that ``cells`` comprises one instance or
+        several instances of ``DensityGrid`` already having the densities
+        evaluated (i.e., ``DensityGrid.densities_evaluated=True``).
+    
     vectorizedpdf : bool, optional
-        if True, assumes that the pdf function is vectorized, i.e., it
+        if ``True``, assumes that the pdf function is vectorized, i.e., it
         accepts  (..., k)-shaped batches of coordinate vectors and returns
-        (...)-shaped batches of densities. If False, assumes that the pdf
+        (...)-shaped batches of densities. If ``False``, assumes that the pdf
         function simply accepts (k,)-shaped coordinate vectors and returns
-        single densities. Default is False.
+        single densities. Default is ``False``.
+    
     pdf_args : tuple, optional
         Additional positional arguments to pass to pdf function; function
-        call is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty
+        call is ``pdf(position, *pdf_args, **pdf_kwargs)``. Default is empty
         tuple (no additional positional arguments).
+    
     pdf_kwargs : dict, optional
         Additional keyword arguments to pass to pdf function; function call
-        is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict
+        is ``pdf(position, *pdf_args, **pdf_kwargs)``. Default is empty dict
         (no additional keyword arguments).
+    
     seed : {None, int, ``numpy.random.Generator``}, optional
         Seed for ``numpy`` random generator. Can be random generator itself,
         in which case it is left unchanged. Can also be the seed to a
-        default generator. Default is None, in which case new default
+        default generator. Default is ``None``, in which case new default
         generator is created. See ``numpy`` random generator docs for more
         information.
+    
     qmc : bool, optional
-        Whether to use Quasi-Monte Carlo sampling. Default is False.
-    qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
-        QMC engine to use if qmc flag above is True. Should be subclass of
-        scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
-        first k dimensions are used for lintsampling, while last dimension is
-        used for cell choice (this happens even if only one cell is given).
-        Default is None. In that case, if qmc is True, then a scrambled Sobol
-        sequence is used.
+        Whether to use Quasi-Monte Carlo sampling. Default is ``False``.
+    
+    qmc_engine : {None, ``scipy.stats.qmc.QMCEngine``}, optional
+        Quasi-Monte Carlo engine to use if ``qmc`` flag above is True. Should be
+        subclass of ``scipy`` ``QMCEngine``, e.g. ``qmc.Sobol``. Should have
+        dimensionality k+1, because first k dimensions are used for
+        lintsampling, while last dimension is used for cell choice (this happens
+        even if only one cell is given). Default is ``None``. In that case, if
+        qmc is True, then a scrambled Sobol sequence is used.
 
+    
     Attributes
     ----------
+    
     pdf : {None, function}
         PDF function to evaluate on grid. None if densities pre-evaluated. See
         corresponding parameter above.
+    
     vectorizedpdf : bool
         Whether PDF function is vectorized. See corresponding parameter above.
+    
     pdf_args : tuple
         Additional positional arguments for PDF function. See corresponding
         parameter above.
+    
     pdf_kwargs : dict
         Additional keyword arguments for PDF function. See corresponding
         parameter above.
+    
     dim : int
         Dimensionality of PDF / coordinate space.
+    
     grids : list
-        List of `DensityGrid` instances corresponding to series of coordinate
-        grids passed by the user in `cells` parameter. Single list element
+        List of ``DensityGrid`` instances corresponding to series of coordinate
+        grids passed by the user in ``cells`` parameter. Single list element
         if only one grid passed.
+    
     ngrids : int
-        Number of coordinate grids to sample over (i.e., length of `grids`
+        Number of coordinate grids to sample over (i.e., length of ``grids``
         attribute).
+    
     qmc : bool
         Whether to use Quasi-Monte Carlo sampling. See corresponding parameter
         above.
-    rng : numpy.random.Generator
-        `numpy` random generator used for generating samples. Used alongside
-        `scipy` `QMCEngine` if `qmc` is True.
-    qmc_engine : {None, scipy.stats.qmc.QMCEngine}
-        `scipy` `QMCEngine` used for generating samples if `qmc` is True.
     
-    Methods
-    -------
-    sample(N_samples=None)
-        Draw samples from given PDF over given grid(s).
-    reset_cells(cells)
-        Reset sampling domain without changing PDF.
+    rng : ``numpy.random.Generator``
+        Random generator used for generating samples. Used alongside Quasi-Monte
+        Carlo engine if ``qmc`` is True.
+    
+    qmc_engine : {None, ``scipy.stats.qmc.QMCEngine``}
+        Quasi-Monte Carlo engine used for generating samples if `qmc` is True.
+
         
     Examples
     --------
@@ -159,7 +174,7 @@ class LintSampler:
            [3.56093155e+00, 1.48548481e+02],
            [1.31163401e+00, 1.59335676e+02]])
 
-    This returns a 2D array, shape ``N_samples`` x k: the ``N_samples`` k-D
+    This returns a 2D array, shape (``N_samples``, k): the ``N_samples`` k-D
     samples within the grid.
     """
     def __init__(
