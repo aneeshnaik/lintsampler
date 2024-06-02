@@ -12,28 +12,23 @@ class DensityGrid:
 
     Parameters
     ----------
-    
-    cells : 1D iterable or tuple of 1D iterables
+    edges : 1D iterable or tuple of 1D iterables
         If a single 1D iterable (i.e., array, tuple, list of numbers), then this
         represents the cell `edges` of a 1D grid. So a 1D grid with N cells
-        should have ``cells`` parameter as a 1D array with N+1 elements. If a
-        tuple of 1D iterables, then this represents the edges values for a 
+        should have ``edges`` parameter as a 1D array with N+1 elements. If a
+        tuple of 1D iterables, then this represents the edge values for a 
         k-dimensional grid with dimensionality equal to the length of the tuple.
-        So, a kD grid with (N0 x N1 x ... x N{k-1}) cells should take a length-k
-        tuple, with arrays length N0+1, N1+1 etc.
-
+        So, a kD grid with (N1 x N2 x ... x Nk) cells should take a length-k
+        tuple, with arrays length N1+1, N2+1 etc.
 
     Attributes
-    ----------
- 
+    ---------- 
     dim : int
         Dimensionality of grid.
- 
     shape : tuple
         ``dim``-length tuple giving grid shape. For example, if 
-        ``edgearrays`` have lengths N0+1, N1+1, ... N{k-1}+1, then ``shape`` is
-        (N0, N1, ..., N{k-1}).
-
+        ``edgearrays`` have lengths N1+1, N2+1, ... Nk+1, then ``shape`` is
+        (N1, N2, ..., Nk).
     ncells : int
         Total number of cells in grid, i.e., the product over the shape tuple.
     edgearrays : list
@@ -65,30 +60,30 @@ class DensityGrid:
         If `densities_evaluated`, total probability mass of this grid; sum over
         `masses` array. None if not `densities_evaluated`.
     """
-    def __init__(self, cells):
+    def __init__(self, edges):
         
         # 1D case: cells is 1D iterable (array, tuple, list)
         # e.g. cells = np.linspace(-4,4,50)
-        if _is_1D_iterable(cells):
+        if _is_1D_iterable(edges):
 
             # store dimensionality (1) and single edgearray and dims
             self.dim = 1
-            self.edgearrays = [np.array(cells)]
-            self.edgeshape = (len(cells),)
+            self.edgearrays = [np.array(edges)]
+            self.edgeshape = (len(edges),)
 
         # kD case: cells is tuple of 1D iterables
         # e.g. cells = (np.linspace(-12,12,100),np.linspace(-4,4,50))
-        elif isinstance(cells, tuple) and _is_1D_iterable(cells[0]):
+        elif isinstance(edges, tuple) and _is_1D_iterable(edges[0]):
             
             # infer dimensionality
-            self.dim = len(cells)
+            self.dim = len(edges)
 
             # loop over dimensions, store edge arrays and dims
             self.edgearrays = []
             self.edgeshape = ()
             for d in range(0,self.dim):
-                self.edgearrays.append(np.array(cells[d]))
-                self.edgeshape += (len(cells[d]),)
+                self.edgearrays.append(np.array(edges[d]))
+                self.edgeshape += (len(edges[d]),)
         
         # cells type not recognised
         else:

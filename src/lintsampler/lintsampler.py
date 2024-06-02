@@ -360,10 +360,10 @@ class LintSampler:
                     f"List members of different types"
                 )
             self.ngrids = len(cells)
-            self.grids = [DensityGrid(cells=ci) for ci in cells]
+            self.grids = [DensityGrid(edges=ci) for ci in cells]
         else:
             self.ngrids = 1
-            self.grids = [DensityGrid(cells=cells)]
+            self.grids = [DensityGrid(edges=cells)]
 
         # get dimensionality of problem from first grid
         self.dim = self.grids[0].dim
