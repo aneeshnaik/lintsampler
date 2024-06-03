@@ -29,6 +29,7 @@ license
 examples/1_gmm
 examples/2_doughnuts
 examples/3_dark_matter
+examples/bonus_logo
 ```
 
 ```{toctree}
