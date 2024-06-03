@@ -3,7 +3,7 @@ from functools import reduce
 from warnings import warn
 from .utils import _is_1D_iterable, _choice
 
-#TODO: remove edgeshape attribute
+
 class DensityGrid:
     """Grid-like object over which density function is evaluated.
 
@@ -48,9 +48,6 @@ class DensityGrid:
         Total number of cells in grid, i.e., the product over the shape tuple.
     edgearrays : list
         Length ``dim`` list of arrays of grid edges along each dimension.
-    edgeshape : tuple
-        Length ``dim`` tuple giving lengths of `edgearrays`. This is equal to
-        ``shape`` tuple, but plus one to each element.
     mins : ``numpy`` array
         1D array (length ``dim``), giving lower coordinate bound of grid
         along each dimension.
@@ -62,9 +59,8 @@ class DensityGrid:
         ``evaluate`` method) yet. 
     vertex_densities : {``None``, ``numpy`` array}
         If ``densities_evaluated``, k-dimensional array giving densities at
-        vertices of grid. Shape is equal to ``edgeshape`` attribute, i.e.
-        (N1+1, N2+1, ...) if grid has shape (N1, N2, ...). ``None`` if not 
-        ``densities_evaluated``.
+        vertices of grid. Shape is (N1+1, N2+1, ...) if grid has (N1, N2, ...)
+        cells along each dimension. ``None`` if not ``densities_evaluated``.
     masses : {``None``, ``numpy`` array}
         If ``densities_evaluated``, k-dimensional array of probability masses of
         grid cells. Shape is equal to grid shape (``shape`` attribute). Masses
@@ -74,7 +70,6 @@ class DensityGrid:
     total_mass : {``None``, float}
         If ``densities_evaluated``, total probability mass of this grid; sum over
         ``masses`` array. ``None`` if not ``densities_evaluated``.
-
 
     Examples
     --------
@@ -253,7 +248,7 @@ class DensityGrid:
             # store dimensionality (1) and single edgearray and dims
             self.dim = 1
             self.edgearrays = [np.array(edges)]
-            self.edgeshape = (len(edges),)
+            self._edgeshape = (len(edges),)
 
         # kD case: cells is tuple of 1D iterables
         # e.g. cells = (np.linspace(-12,12,100),np.linspace(-4,4,50))
@@ -264,10 +259,10 @@ class DensityGrid:
 
             # loop over dimensions, store edge arrays and dims
             self.edgearrays = []
-            self.edgeshape = ()
+            self._edgeshape = ()
             for d in range(0,self.dim):
                 self.edgearrays.append(np.array(edges[d]))
-                self.edgeshape += (len(edges[d]),)
+                self._edgeshape += (len(edges[d]),)
         
         # cells type not recognised
         else:
@@ -292,7 +287,7 @@ class DensityGrid:
         # geometry-related attrs
         self.mins = np.array([arr[0] for arr in self.edgearrays])
         self.maxs = np.array([arr[-1] for arr in self.edgearrays])
-        self.shape = tuple(d - 1 for d in self.edgeshape)
+        self.shape = tuple(d - 1 for d in self._edgeshape)
         self.ncells = np.prod(self.shape)
 
         # density-related attrs (None because densities not yet evaluated)
@@ -345,7 +340,7 @@ class DensityGrid:
             self.reset_densities()
 
         # number of vertices in grid
-        npts = np.prod(self.edgeshape)
+        npts = np.prod(self._edgeshape)
         
         # create the flattened grid for evaluation in k>1 case
         if self.dim > 1:
@@ -371,7 +366,7 @@ class DensityGrid:
             raise ValueError("Grid._evaluate_pdf: Detected non-finite density")
 
         # reshape densities to grid
-        densities = densities.reshape(self.edgeshape)
+        densities = densities.reshape(self._edgeshape)
 
         # store attributes
         self.densities_evaluated = True
