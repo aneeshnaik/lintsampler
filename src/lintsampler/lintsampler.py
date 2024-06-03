@@ -63,7 +63,7 @@ class LintSampler:
         is ``pdf(position, *pdf_args, **pdf_kwargs)``. Default is empty dict
         (no additional keyword arguments).
     
-    seed : {None, int, ``numpy.random.Generator``}, optional
+    seed : {``None``, int, ``numpy.random.Generator``}, optional
         Seed for ``numpy`` random generator. Can be random generator itself,
         in which case it is left unchanged. Can also be an integer seed for a
         generator instance. Default is ``None``, in which case new default
@@ -73,7 +73,7 @@ class LintSampler:
     qmc : bool, optional
         Whether to use Quasi-Monte Carlo sampling. Default is ``False``.
     
-    qmc_engine : {None, ``scipy.stats.qmc.QMCEngine``}, optional
+    qmc_engine : {``None``, ``scipy.stats.qmc.QMCEngine``}, optional
         Quasi-Monte Carlo engine to use if ``qmc`` flag above is True. Should be
         subclass of ``scipy`` ``QMCEngine``, e.g. ``qmc.Sobol``. Should have
         dimensionality ``dim``+1, because first ``dim`` dimensions are used for
@@ -85,7 +85,7 @@ class LintSampler:
     Attributes
     ----------
     
-    pdf : {None, function}
+    pdf : {``None``, function}
         PDF function to evaluate on grid. ``None`` if densities pre-evaluated.
         See corresponding parameter above.
     
@@ -121,7 +121,7 @@ class LintSampler:
         Random generator used for generating samples. Used alongside Quasi-Monte
         Carlo engine if ``qmc`` is True.
     
-    qmc_engine : {None, ``scipy.stats.qmc.QMCEngine``}
+    qmc_engine : {``None``, ``scipy.stats.qmc.QMCEngine``}
         Quasi-Monte Carlo engine used for generating samples if ``qmc`` is True.
 
         

@@ -32,33 +32,33 @@ class DensityGrid:
     ncells : int
         Total number of cells in grid, i.e., the product over the shape tuple.
     edgearrays : list
-        Length `dim` list of arrays of grid edges along each dimension.
+        Length ``dim`` list of arrays of grid edges along each dimension.
     edgeshape : tuple
-        Length `dim` tuple giving lengths of `edgearrays`. This is equal to
-        `shape` tuple, but plus one to each element.
-    mins : numpy array
-        1D numpy array (length `dim`), giving lower coordinate bound of grid
+        Length ``dim`` tuple giving lengths of `edgearrays`. This is equal to
+        ``shape`` tuple, but plus one to each element.
+    mins : ``numpy`` array
+        1D array (length ``dim``), giving lower coordinate bound of grid
         along each dimension.
-    maxs : numpy array
-        1D numpy array (length `dim`), giving upper coordinate bound of grid
+    maxs : ``numpy`` array
+        1D array (length ``dim``), giving upper coordinate bound of grid
         along each dimension.
     densities_evaluated : bool
         Flag indicating whether density function has been evaluated on grid (via
-        `evaluate` method) yet. 
-    vertex_densities : {None, numpy array}
-        If `densities_evaluated`, k-dimensional array giving densities at
-        vertices of grid. Shape is equal to `edgeshape` attribute, i.e.
-        (N0+1, N1+1, ...) if grid has shape (N0, N1, ...). None if not 
-        `densities_evaluated`.
-    masses : {None, numpy array}
-        If `densities_evaluated`, k-dimensional array of probability masses of
-        grid cells. Shape is equal to grid shape (see `shape` attribute). Masses
+        ``evaluate`` method) yet. 
+    vertex_densities : {``None``, ``numpy`` array}
+        If ``densities_evaluated``, k-dimensional array giving densities at
+        vertices of grid. Shape is equal to ``edgeshape`` attribute, i.e.
+        (N1+1, N2+1, ...) if grid has shape (N1, N2, ...). ``None`` if not 
+        ``densities_evaluated``.
+    masses : {``None``, ``numpy`` array}
+        If ``densities_evaluated``, k-dimensional array of probability masses of
+        grid cells. Shape is equal to grid shape (``shape`` attribute). Masses
         are calculated according to trapezoid rule, i.e., cell volumes
-        multiplied by average vertex densities. None if not 
-        `densities_evaluated`.
-    total_mass : {None, float}
-        If `densities_evaluated`, total probability mass of this grid; sum over
-        `masses` array. None if not `densities_evaluated`.
+        multiplied by average vertex densities. ``None`` if not 
+        ``densities_evaluated``.
+    total_mass : {``None``, float}
+        If ``densities_evaluated``, total probability mass of this grid; sum over
+        ``masses`` array. ``None`` if not ``densities_evaluated``.
     """
     def __init__(self, edges):
         
