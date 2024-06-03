@@ -38,18 +38,20 @@ class LintSampler:
         Probability density function from which to draw samples. Function should
         take coordinate vector (or batch of vectors if vectorized; see
         ``vectorizedpdf`` parameter) and return (unnormalised) density (or batch
-        of densities). Additional arguments can be passed to the function via
-        ``pdf_args`` and ``pdf_kwargs`` parameters. Default is ``None``, in
-        which case it is assumed that ``cells`` comprises one instance or
-        several instances of ``DensityGrid`` already having the densities
-        evaluated (i.e., ``DensityGrid.densities_evaluated=True``).
+        of densities if vectorized). Additional arguments can be passed to the
+        function via ``pdf_args`` and ``pdf_kwargs`` parameters. Default is
+        ``None``, in which case it is assumed that ``cells`` comprises one
+        instance or a list of several instances of ``DensityGrid``, already
+        having densities evaluated (i.e., the ``DensityGrid`` attribute 
+        ``densities_evaluated`` is ``True``).
     
     vectorizedpdf : bool, optional
         if ``True``, assumes that the pdf function is vectorized, i.e., it
-        accepts  (..., k)-shaped batches of coordinate vectors and returns
+        accepts  (..., ``dim``)-shaped batches of coordinate vectors and returns
         (...)-shaped batches of densities. If ``False``, assumes that the pdf
-        function simply accepts (k,)-shaped coordinate vectors and returns
-        single densities. Default is ``False``.
+        function simply accepts (``dim``,)-shaped coordinate vectors (or floats
+        in the univariate case) and returns single densities. Default is
+        ``False``.
     
     pdf_args : tuple, optional
         Additional positional arguments to pass to pdf function; function
@@ -63,8 +65,8 @@ class LintSampler:
     
     seed : {None, int, ``numpy.random.Generator``}, optional
         Seed for ``numpy`` random generator. Can be random generator itself,
-        in which case it is left unchanged. Can also be the seed to a
-        default generator. Default is ``None``, in which case new default
+        in which case it is left unchanged. Can also be an integer seed for a
+        generator instance. Default is ``None``, in which case new default
         generator is created. See ``numpy`` random generator docs for more
         information.
     
@@ -74,7 +76,7 @@ class LintSampler:
     qmc_engine : {None, ``scipy.stats.qmc.QMCEngine``}, optional
         Quasi-Monte Carlo engine to use if ``qmc`` flag above is True. Should be
         subclass of ``scipy`` ``QMCEngine``, e.g. ``qmc.Sobol``. Should have
-        dimensionality k+1, because first k dimensions are used for
+        dimensionality ``dim``+1, because first ``dim`` dimensions are used for
         lintsampling, while last dimension is used for cell choice (this happens
         even if only one cell is given). Default is ``None``. In that case, if
         qmc is True, then a scrambled Sobol sequence is used.
@@ -84,18 +86,19 @@ class LintSampler:
     ----------
     
     pdf : {None, function}
-        PDF function to evaluate on grid. None if densities pre-evaluated. See
-        corresponding parameter above.
+        PDF function to evaluate on grid. ``None`` if densities pre-evaluated.
+        See corresponding parameter above.
     
     vectorizedpdf : bool
-        Whether PDF function is vectorized. See corresponding parameter above.
+        Whether ``pdf`` function is vectorized. See corresponding parameter
+        above.
     
     pdf_args : tuple
-        Additional positional arguments for PDF function. See corresponding
+        Additional positional arguments for ``pdf`` function. See corresponding
         parameter above.
     
     pdf_kwargs : dict
-        Additional keyword arguments for PDF function. See corresponding
+        Additional keyword arguments for ``pdf`` function. See corresponding
         parameter above.
     
     dim : int
@@ -119,7 +122,7 @@ class LintSampler:
         Carlo engine if ``qmc`` is True.
     
     qmc_engine : {None, ``scipy.stats.qmc.QMCEngine``}
-        Quasi-Monte Carlo engine used for generating samples if `qmc` is True.
+        Quasi-Monte Carlo engine used for generating samples if ``qmc`` is True.
 
         
     Examples
@@ -214,46 +217,46 @@ class LintSampler:
         # configure random state according to given random seed and QMC params
         self._set_random_state(seed, qmc, qmc_engine)
 
-    def sample(self, N_samples=None):
+    def sample(self, N=None):
         """Draw samples from the pdf on the constructed grid(s).
         
-        This function draws a sample (or N samples) from the given PDF over the
-        given grid(s). It first chooses a grid (or N grids with replacement),
-        weighting them by their total mass, then similarly chooses a cell
-        (or N cells), then samples from the k-linear interpolant within the
-        chosen cell(s).
+        This function draws a sample (or ``N`` samples) from the given PDF over
+        the given grid(s). It first chooses a grid (or ``N`` grids with
+        replacement), weighting them by their total mass, then similarly chooses
+        a cell (or ``N`` cells), then samples from the k-linear interpolant
+        within the chosen cell(s).
         
         Parameters
         ----------
-        N_samples : {None, int}, optional
-            Number of samples to draw. Default is None, in which case a single
-            sample is drawn.
+        N : {None, int}, optional
+            Number of samples to draw. Default is ``None``, in which case a
+            single sample is drawn.
 
         Returns
         -------
-        X : scalar, 1D array (length k OR N_samples) or 2D array (N_samples, k)
+        X : scalar, 1D array (length k OR ``N``) or 2D array (``N``, k)
             Sample(s) from linear interpolant. Scalar if single sample (i.e.,
-            N_samples is None) in 1D. 1D array if single sample in k-D OR 
+            ``N`` is None) in 1D. 1D array if single sample in k-D OR 
             multiple samples in 1D. 2D array if multiple samples in k-D.
         
         """
         # check N_samples sensible
-        if (N_samples is not None):
-            if not isinstance(N_samples, int):
+        if (N is not None):
+            if not isinstance(N, int):
                 raise TypeError(
                     "LintSampler.sample: "\
-                    f"Expected int N_samples, got {type(N_samples)}"
+                    f"Expected int N, got {type(N)}"
                 )
-            elif N_samples <= 0:
+            elif N <= 0:
                 raise ValueError(
                     "LintSampler.sample: "\
-                    f"Expected positive N_samples, got {N_samples}"
+                    f"Expected positive N, got {N}"
                 )
 
-        # generate uniform samples (N_samples, k+1) if N_samples, else (1, k+1)
+        # generate uniform samples (N, k+1) if N, else (1, k+1)
         # first k dims used for lintsampling, last dim used for cell choice
-        if N_samples:
-            u = self._generate_usamples(N_samples)
+        if N:
+            u = self._generate_usamples(N)
         else:
             u = self._generate_usamples(1)
         
@@ -291,13 +294,13 @@ class LintSampler:
                     X = np.vstack((X, _grid_sample(self.grids[i], usub)))
 
         # final shuffle (important if using QMC with multiple grids)
-        if N_samples:
+        if N:
             self.rng.shuffle(X, axis=0)
 
         # squeeze down to scalar / 1D if appropriate
-        if not N_samples and (self.dim == 1):
+        if not N and (self.dim == 1):
             X = X.item()
-        elif not N_samples:
+        elif not N:
             X = X[0]
         elif (self.dim == 1):
             X = X.squeeze()
