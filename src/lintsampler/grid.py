@@ -3,12 +3,27 @@ from functools import reduce
 from warnings import warn
 from .utils import _is_1D_iterable, _choice
 
-
+#TODO: remove edgeshape attribute
 class DensityGrid:
     """Grid-like object over which density function is evaluated.
 
-    #TODO extended description
-    #TODO: examples
+    ``DensityGrid`` takes a single parameter, ``edges``, and uses it to
+    construct a rectilinear grid. ``edges`` should contain one or k sequences of
+    numbers representing the `edges` of a one- or k-dimensional grid. The given
+    edges need not be evenly spaced, but should be monotonically increasing.
+    After construction, various grid-related attributes become available.
+
+    The key method of the class is ``evaluate``, in which a given PDF is
+    evaluated on the `vertices` of the grid and stored as an attribute
+    (``vertex_densities``) alongside several other new attributes relating
+    to the densities/probability masses on the grid. The Boolean flag
+    ``densities_evaluated`` switches to ``True`` at this point. After calling
+    this method, several new methods become available: ``choose`` returns
+    random cells weighted by their probabilities, and 
+    ``get_cell_corner_densities`` returns the densities on the corners of given
+    cells.
+ 
+    See the examples below for the various usage patterns.
 
     Parameters
     ----------
@@ -59,6 +74,175 @@ class DensityGrid:
     total_mass : {``None``, float}
         If ``densities_evaluated``, total probability mass of this grid; sum over
         ``masses`` array. ``None`` if not ``densities_evaluated``.
+
+
+    Examples
+    --------
+
+    These examples demonstrate the various ways to set up and use an instance
+    of ``DensityGrid``.
+
+    - A one-dimensional grid, spanning x=0 to x=10 with 32 cells (so 33 edges).
+    
+      >>> g = DensityGrid(np.linspace(0, 30, 33))
+    
+      At this point, the object ``g`` has various attributes set up describing
+      the grid and its geometry. We'll save a demonstration of these for the
+      next example, where they will be more interesting.
+
+    - A two-dimensional grid, with 32 x 64 cells (so 33 gridlines along one
+      axis and 65 along the other).
+    
+      >>> x = np.linspace(0, 10, 33)
+      >>> y = np.linspace(100, 200, 65)
+      >>> g = DensityGrid((x, y))
+
+      Let's explore some of the attributes of ``g``. First, some basic
+      descriptors of the grid geometry:
+       
+      >>> g.dim
+      2
+      >>> g.shape
+      (32, 64)
+      >>> g.ncells
+      2048
+       
+      There are also array attributes called ``mins`` and ``maxs`` which give
+      the coordinates of the 'first' and 'last' corners of the grid. In 2D,
+      these are the bottom-left and top-right:
+       
+      >>> g.mins
+      array([  0., 100.])
+      >>> g.maxs
+      array([ 10., 200.])
+       
+      Meanwhile, ``edgearrays`` gives a list of the input edge arrays:
+       
+      >>> len(g.edgearrays)
+      2
+      >>> all(g.edgearrays[0] == x)
+      True
+      >>> all(g.edgearrays[1] == y)
+      True
+      
+      Finally, the flag ``densities_evaluated`` tells us that we have not yet
+      called the ``evaluate`` method to get the grid vertex densities:
+      
+      >>> g.densities_evaluated
+      False
+
+    - It is also possible to construct a grid with just a single cell.
+    
+      In one dimension:
+    
+      >>> g = DensityGrid([0, 10])
+      >>> g.ncells
+      1
+       
+      In multiple dimensions:
+       
+      >>>  g = DensityGrid(([0, 10], [100, 200]))
+      >>> g.ncells
+      1
+
+    - Now, a demonstration of using ``evaluate`` to evaluate a given 1D PDF
+      function.
+    
+      As an example in 1D we can take an unnormalised Gaussian:
+      >>> pdf = lambda x: np.exp(-x**2)      
+      >>> g = DensityGrid(np.linspace(-3, 3, 7))
+      >>> g.evaluate(pdf)
+      
+      Having called ``evaluate``, the ``densities_evaluated`` flag is now
+      ``True`` and various other attributes are now meaningful:
+      
+      >>> g.densities_evaluated
+      True
+      >>> g.vertex_densities
+      array([1.23409804e-04, 1.83156389e-02, 3.67879441e-01, 1.00000000e+00,
+             3.67879441e-01, 1.83156389e-02, 1.23409804e-04])
+      >>> g.masses
+      array([0.00921952, 0.19309754, 0.68393972, 0.68393972, 0.19309754,
+             0.00921952])
+      >>> g.total_mass
+      1.7725135699244396
+      
+      ``vertex_densities`` contains the densities on the 7 grid vertices, while
+      ``masses`` contains the masses of the 6 cells, and ``total_mass`` gives
+      the total probability mass across the grid.
+      
+      Things are slightly more efficient when the PDF function is vectorized,
+      i.e., the PDF function takes a batch of input positions and returns a
+      corresponding batch of densities. As it happens, the PDF function written
+      above is already nicely vectorized, so we can let ``evaluate`` know with
+      a flag. We can use the same grid object as above, taking care to first
+      reset the densities.
+      
+      >>> g.reset_densities()
+      >>> g.evaluate(pdf, vectorizedpdf=True)
+    
+    - Another example of ``evaluate``, now with a bivariate PDF.
+      
+      For the PDF function, rather than writing our own we'll use the bivariate
+      standard normal PDF from ``scipy.stats.multivariate_normal``:
+    
+      >>> pdf = multivariate_normal(mean=np.zeros(2), cov=np.eye(2)).pdf
+      >>> g = DensityGrid((np.linspace(-3, 3, 129), np.linspace(-3, 3, 129)))
+      >>> g.evaluate(pdf, vectorizedpdf=True)
+      >>> g.total_mass
+      0.9945979872720603
+      
+    - Example usage of ``choose`` and ``get_cell_corner_densities`` methods
+      
+      Once the ``evaluate`` method has been called (so that the attribute 
+      ``densities_evaluated`` is ``True``), the ``choose`` method can be used
+      to randomly select grid cells (weighted by their masses), given a 1D
+      array of uniform samples.
+      
+      Taking the same 2D grid and PDF as in the previous example:
+      
+      >>> pdf = multivariate_normal(mean=np.zeros(2), cov=np.eye(2)).pdf
+      >>> g = DensityGrid((np.linspace(-3, 3, 129), np.linspace(-3, 3, 129)))
+      >>> g.evaluate(pdf, vectorizedpdf=True)
+      >>> u = np.random.default_rng().uniform(size=10)  
+      >>> cells = g.choose(u)
+      >>> cells
+      array([[70, 89],
+             [72, 36],
+             [46, 41],
+             [67, 41],
+             [74, 92],
+             [77, 60],
+             [38, 56],
+             [83, 40],
+             [69, 64],
+             [82, 49]])
+
+      This returns a 2D array, shaped (10, 2), 10 because we fed in 10 uniform
+      samples and 2 because we have a 2D grid (and bivariate PDF). The integer
+      array elements represent the cell indices along each dimension of the
+      grid.
+      
+      We can take this array of cells and feed it to the method 
+      ``get_cell_corner_densities`` to get the vertex densities at the corners
+      of the given cells.
+      
+      >>> g.get_cell_corner_densities(cells)
+      (array([0.0680767 , 0.09707593, 0.12093098, 0.05393205, 0.09988883,
+              0.02469491, 0.13291402, 0.04088934, 0.14672783, 0.01712865]),
+       array([0.06479294, 0.09382542, 0.12213264, 0.05247092, 0.10380458,
+              0.025776  , 0.13045465, 0.04401268, 0.1449653 , 0.01703481]),
+       array([0.0655087 , 0.1002186 , 0.12484592, 0.0505471 , 0.09761065,
+              0.02279171, 0.13571763, 0.0416602 , 0.14883847, 0.01888807]),
+       array([0.0623488 , 0.09686286, 0.12608648, 0.04917767, 0.10143709,
+              0.02378948, 0.13320639, 0.04484242, 0.14705059, 0.0187846 ]))
+
+      This returns a length-4 tuple of length-10 arrays. 4 because each of the
+      10 cells has 4 corners. So, the first array contains the densities at
+      the 00-corner of each cell, the second array contains the 01-densities,
+      the third array gives the 10-densities, and the fourth array gives the
+      11-densities.
+      
     """
     def __init__(self, edges):
         
@@ -200,7 +384,7 @@ class DensityGrid:
         
         Parameters
         ----------
-        u : 1D array of ints, shape
+        u : 1D array of ints, shape (N,)
             Array of uniform samples ~ U(0, 1).
             
         Returns
@@ -208,6 +392,7 @@ class DensityGrid:
         cells : 2D array of ints, shape (N, k)
             Grid indices of N chosen cells along the k dimensions of the grid.
         """
+        #TODO throw error if not densities evaluated
         if self.ncells == 1:
             return np.zeros((len(u), self.dim), dtype=np.int32)
             
@@ -235,6 +420,7 @@ class DensityGrid:
             Densities at corners of given cells. Conventional ordering applies,
             e.g., in 3D: (f000, f001, f010, f011, f100, f101, f110, f111)
         """
+        #TODO throw error if not densities evaluated
         # loop over 2^k corners, get densities at each
         corners = []
         for i in range(2**self.dim):
