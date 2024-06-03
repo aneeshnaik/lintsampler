@@ -15,22 +15,22 @@ class LintSampler:
     Parameters
     ----------
     
-    cells : iterable or ``DensityGrid``
+    domain : iterable or ``DensityGrid``
         Coordinate grid(s) to draw samples over. Several forms are available. If
-        using a single coordinate grid, then `cells` can be any of:
+        using a single coordinate grid, then ``domain`` can be any of:
         
         - a 1D iterable (array, list, tuple) representing the cell edges of a 1D
           grid. So, if the grid has N cells, then the iterable should have N+1
           elements.
         - a tuple of 1D iterables, representing the cell edges of a kD grid. If
-          the grid has (N1, N2, ..., Nk) cells, then the tuple should have length
-          k, and the 1D arrays in the tuple should have lengths N1+1, N2+1, ...,
-          Nk+1.
+          the grid has (N1, N2, ..., Nk) cells, then the tuple should have
+          length k, and the 1D arrays in the tuple should have lengths 
+          N1+1, N2+1, ..., Nk+1.
         - a ``DensityGrid`` instance, either with densities pre-evaluated or
           not. If densities are already evaluated, ``pdf`` parameter should not
           be set and vice versa.
         
-        If using multiple (non-overlapping) coordinate grids, then ``cells``
+        If using multiple (non-overlapping) coordinate grids, then ``domain``
         should be a list of any of the above. See the examples below for the
         various usage patterns.
     
@@ -40,10 +40,10 @@ class LintSampler:
         ``vectorizedpdf`` parameter) and return (unnormalised) density (or batch
         of densities if vectorized). Additional arguments can be passed to the
         function via ``pdf_args`` and ``pdf_kwargs`` parameters. Default is
-        ``None``, in which case it is assumed that ``cells`` comprises one
-        instance or a list of several instances of ``DensityGrid``, already
-        having densities evaluated (i.e., the ``DensityGrid`` attribute 
-        ``densities_evaluated`` is ``True``).
+        ``None``, in which case it is assumed that ``domain`` parameter 
+        comprises one instance or a list of several instances of 
+        ``DensityGrid``, already having densities evaluated (i.e., the
+        ``DensityGrid`` attribute ``densities_evaluated`` is ``True``).
     
     vectorizedpdf : bool, optional
         if ``True``, assumes that the pdf function is vectorized, i.e., it
@@ -106,7 +106,7 @@ class LintSampler:
     
     grids : list
         List of ``DensityGrid`` instances corresponding to series of coordinate
-        grids passed by the user in ``cells`` parameter. Single list element
+        grids passed by the user in ``domain`` parameter. Single list element
         if only one grid passed.
     
     ngrids : int
@@ -181,7 +181,7 @@ class LintSampler:
     samples within the grid.
     """
     def __init__(
-        self, cells,
+        self, domain,
         pdf=None, vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
         seed=None, qmc=False, qmc_engine=None
     ):
@@ -191,8 +191,8 @@ class LintSampler:
         self.pdf_args = pdf_args
         self.pdf_kwargs = pdf_kwargs
 
-        # set up the sampling grid under the hood
-        self._set_grids(cells=cells)
+        # set up the sampling grids under the hood
+        self._set_grids(domain=domain)
         
         # if given, evaluate PDF on grids, else check grids already evaluated
         if self.pdf:
@@ -307,20 +307,20 @@ class LintSampler:
 
         return X
 
-    def reset_cells(self, cells):
+    def reset_domain(self, domain):
         """Reset the sampling grid(s) without changing the pdf.
         
         Parameters
         ----------
-        cells : iterable or `DensityGrid`
-            See `cells` entry in documentation for class constructor.
+        domain : iterable or `DensityGrid`
+            See ``domain`` entry in documentation for class constructor.
         
         Returns
         -------
         None
         """
         # reset grid(s)
-        self._set_grids(cells=cells)
+        self._set_grids(domain=domain)
         
         # evaluate PDF on new grids / check grids already evaluated
         if self.pdf:
@@ -332,41 +332,41 @@ class LintSampler:
                     f"No densities pre-evaluated on grids and no PDF provided."
                 )
 
-    def _set_grids(self, cells):
+    def _set_grids(self, domain):
         """Configure the grid(s) for sampling.
 
         Parameters
         ----------
-        cells : iterable or `DensityGrid`
-            See `cells` entry in documentation for class constructor.
+        domain : iterable or `DensityGrid`
+            See ``domain`` entry in documentation for class constructor.
 
         Returns
         -------
         None
         """
-        # cells cases:
-        # - cells is a single pre-made density grid
-        # - cells is a list of ditto
-        # - cells is a list of: 1D iterables or tuples of 1D iterables
-        # - cells is a single 1D iterable / tuple of 1D iterables
-        if isinstance(cells, DensityGrid):
+        # domain cases:
+        # - domain is a single pre-made density grid
+        # - domain is a list of ditto
+        # - domain is a list of: 1D iterables or tuples of 1D iterables
+        # - domain is a single 1D iterable / tuple of 1D iterables
+        if isinstance(domain, DensityGrid):
             self.ngrids = 1
-            self.grids = [cells]
-        elif isinstance(cells, list) and _all_are_instances(cells, DensityGrid):
-            self.ngrids = len(cells)
-            self.grids = cells
-        elif isinstance(cells, list) and not _is_1D_iterable(cells):
+            self.grids = [domain]
+        elif isinstance(domain, list) and _all_are_instances(domain, DensityGrid):
+            self.ngrids = len(domain)
+            self.grids = domain
+        elif isinstance(domain, list) and not _is_1D_iterable(domain):
             # check all list items are same sort of thing
-            if not _all_are_instances(cells, type(cells[0])):
+            if not _all_are_instances(domain, type(domain[0])):
                 raise TypeError(
                     "LintSampler._set_grids: "\
                     f"List members of different types"
                 )
-            self.ngrids = len(cells)
-            self.grids = [DensityGrid(edges=ci) for ci in cells]
+            self.ngrids = len(domain)
+            self.grids = [DensityGrid(edges=ci) for ci in domain]
         else:
             self.ngrids = 1
-            self.grids = [DensityGrid(edges=cells)]
+            self.grids = [DensityGrid(edges=domain)]
 
         # get dimensionality of problem from first grid
         self.dim = self.grids[0].dim
@@ -395,7 +395,7 @@ class LintSampler:
                     )
 
     def _evaluate_pdf(self):
-        """Loop over DensityGrid instances and evaluate PDF on each.
+        """Loop over ``DensityGrid`` instances and evaluate PDF on each.
 
         Returns
         -------
@@ -412,7 +412,7 @@ class LintSampler:
         Returns
         -------
         grids_evaluated : bool
-            Whether all grids in self.grids have densities already evaluated.
+            Whether all ``self.grids`` have densities already evaluated.
         """
         for grid in self.grids:
             if not grid.densities_evaluated:
@@ -424,12 +424,12 @@ class LintSampler:
         
         Parameters
         ----------        
-        seed : {None, int, ``numpy.random.Generator``}
-            See documentation for `seed` in class constructor.
+        seed : {``None``, int, ``numpy.random.Generator``}
+            See documentation for ``seed`` in class constructor.
         qmc : bool
-            See documentation for `qmc` in class constructor.    
-        qmc_engine : {None, scipy.stats.qmc.QMCEngine}
-            See documentation for `qmc_engine` in class constructor.
+            See documentation for ``qmc`` in class constructor.    
+        qmc_engine : {``None``, ``scipy.stats.qmc.QMCEngine``}
+            See documentation for ``qmc_engine`` in class constructor.
 
         Returns
         -------
@@ -492,8 +492,8 @@ class LintSampler:
         Returns
         -------
         u : array
-            2D array of uniform samples shaped (N, dim+1), where `dim` is
-            dimensionality of grid (see self.grid attribute).
+            2D array of uniform samples shaped (``N``, ``dim``+1), where ``dim``
+            is dimensionality of grid (``self.dim`` attribute).
         """
         if self.qmc:
             u = self.qmc_engine.random(N)
