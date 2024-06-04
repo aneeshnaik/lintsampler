@@ -13,7 +13,7 @@
   >>> y = np.linspace(100,200,2)
   >>> z = np.linspace(1000,2000,2)
   >>> def rndmpdf(X): return np.random.uniform(size=X.shape[0])
-  >>> LS = LintSampler(rndmpdf,cells=(x,y,z)).sample(6)
+  >>> LS = LintSampler(rndmpdf,cells=(x,y,z)).sample(N=6)
   array([[  12.63103673,  186.7514952 , 1716.6187807 ],
          [  14.67375968,  116.20984414, 1557.59629547],
          [  11.47055697,  178.41650558, 1592.18260186],

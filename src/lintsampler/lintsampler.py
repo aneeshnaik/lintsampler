@@ -9,8 +9,22 @@ from .sampling import _grid_sample
 class LintSampler:
     """Linear interpolant sampler for density function defined on grid(s).
 
-    #TODO extended description
-    #TODO update examples
+    ``LintSampler`` takes a primary argument, ``domain``, which is the region within
+    which sampling takes place. ``domain`` should contain one or k sequences of
+    numbers representing the `edges` of a one- or k-dimensional grid. The given
+    edges need not be evenly spaced, but should be monotonically increasing.
+    After construction, various grid-related attributes become available. ``domain``
+    may also be a pre-constructed ``DensityGrid`` object; see example below and the
+    ``DensityGrid`` documentation for more details.
+
+    After instantiation, the ``sample`` method may be called, which realises the 
+    random sampling of the ``pdf`` on the domain. ``pdf`` may be directly passed,
+    or it may be pre-evaluated in an input ``DensityGrid`` object. The sampling may
+    either take place at random (default), or in a low-discrepancy sequence (with 
+    `qmc=True`).
+ 
+    See the parameters below for additional control options, and further examples 
+    below for the various usage patterns.
 
     Parameters
     ----------
@@ -136,30 +150,30 @@ class LintSampler:
     cells (so 33 edges). 
     
     >>> cells = np.linspace(0, 10, 33)
-    >>> def pdfrandom(X): return np.random.uniform(size=X.shape[0])
-    >>> LintSampler(pdfrandom,cells).sample()
+    >>> def pdfrandom(X): return np.random.uniform()
+    >>> LintSampler(cells,pdf=pdfrandom).sample()
     6.984134639227398
 
     This returns a single scalar: the sampling point within the grid.
     
-    2. Multiple samples from a 1D grid (same grid as previous example).
+    2. Multiple samples from a 1D grid (same grid as previous example). Now
+    also demonstrating a vectorized pdf for efficiency when N becomes large.
     
     >>> cells = np.linspace(0, 10, 33)
     >>> def pdfrandom(X): return np.random.uniform(size=X.shape[0])
-    >>> LintSampler(pdfrandom,cells).sample(4)
+    >>> LintSampler(cells,pdf=pdfrandom,vectorizedpdf=True).sample(N=4)
     array([8.16447008, 5.30536088, 8.96135879, 7.73572977])
 
-    This returns a 1D array: the ``N_samples`` sampling points within the grid.
+    This returns a 1D array: the ``N`` sampling points within the grid.
 
     3. Single sample from a k-D grid. In this case we'll take a 2D grid, with
-    32 x 64 cells (so 33 gridlines along one axis and 65 along the other, and
-    33x65=2145 intersections with known densities).
+    32 x 64 cells (so 33 gridlines along one axis and 65 along the other).
     
     >>> x = np.linspace(0, 10, 33)
     >>> y = np.linspace(100, 200, 65)
     >>> cells = (x,y)
-    >>> def pdfrandom(X): return np.random.uniform(size=X.shape[0])
-    >>> LintSampler(pdfrandom,cells).sample()
+    >>> def pdfrandom(X): return np.random.uniform()
+    >>> LintSampler(cells,pdf=pdfrandom).sample()
     array([  7.67294632, 190.45302915])
 
     This returns a 1D array: the single k-D sampling point within the grid.
@@ -169,16 +183,29 @@ class LintSampler:
     >>> x = np.linspace(0, 10, 33)
     >>> y = np.linspace(100, 200, 65)
     >>> cells = (x,y)
-    >>> def pdfrandom(X): return np.random.uniform(size=X.shape[0])
-    >>> LintSampler(pdfrandom,cells).sample(5)
+    >>> def pdfrandom(X): return np.random.uniform()
+    >>> LintSampler(cells,pdf=pdfrandom).sample(N=5)
     array([[1.35963966e-01, 1.38182930e+02],
            [6.52704300e+00, 1.63109912e+02],
            [4.35226761e+00, 1.49753235e+02],
            [3.56093155e+00, 1.48548481e+02],
            [1.31163401e+00, 1.59335676e+02]])
 
-    This returns a 2D array, shape (``N_samples``, k): the ``N_samples`` k-D
+    This returgns a 2D array, shape (``N``, k): the ``N`` k-D
     samples within the grid.
+
+    5. A ``DensityGrid`` instance may also be passed to any of the above examples.
+    See the ``DensityGrid`` documentation for details. In this case, one need not
+    pass a pdf.
+
+    >>> x = np.linspace(0, 10, 33)
+    >>> y = np.linspace(100, 200, 65)
+    >>> g = DensityGrid((x, y))
+    >>> def pdfrandom(X): return np.random.uniform()
+    >>> g.evaluate(pdfrandom)
+    >>> LintSampler(g).sample()
+    array([  1.417842  , 139.40070095])
+
     """
     def __init__(
         self, domain,
@@ -240,7 +267,7 @@ class LintSampler:
             multiple samples in 1D. 2D array if multiple samples in k-D.
         
         """
-        # check N_samples sensible
+        # check N sensible
         if (N is not None):
             if not isinstance(N, int):
                 raise TypeError(
@@ -273,7 +300,7 @@ class LintSampler:
             p = grid_masses / grid_masses.sum()
 
             # choose grids:
-            # grid_choice is 1D array of grid indices, length N_samples            
+            # grid_choice is 1D array of grid indices, length N            
             grid_choice = _choice(p, u[:, -1])
 
             # cdf is 1D array giving CDF over grids, length self.ngrids + 1

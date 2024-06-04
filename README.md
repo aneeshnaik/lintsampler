@@ -48,7 +48,7 @@ def gmm_pdf(x):
 from lintsampler import LintSampler
 
 grid = np.linspace(-7,7,100)
-samples = LintSampler(grid,pdf=gmm_pdf).sample(N_samples=10000)
+samples = LintSampler(grid,pdf=gmm_pdf).sample(N=10000)
 ```
 
 Making a histogram of the resulting samples and comparing to the input density function shows good agreement -- and we can do even better by increasing the resolution.

@@ -379,7 +379,7 @@ class DensityGrid:
         
         Parameters
         ----------
-        u : 1D array of ints, shape (N,)
+        u : 1D array of floats, shape (N,)
             Array of uniform samples ~ U(0, 1).
             
         Returns
@@ -387,7 +387,9 @@ class DensityGrid:
         cells : 2D array of ints, shape (N, k)
             Grid indices of N chosen cells along the k dimensions of the grid.
         """
-        #TODO throw error if not densities evaluated
+        if self.densities_evaluated == False:
+            raise RuntimeError("Grid.choose: Densities must be evaluated on the grid prior to choosing cells.")
+
         if self.ncells == 1:
             return np.zeros((len(u), self.dim), dtype=np.int32)
             
@@ -415,7 +417,9 @@ class DensityGrid:
             Densities at corners of given cells. Conventional ordering applies,
             e.g., in 3D: (f000, f001, f010, f011, f100, f101, f110, f111)
         """
-        #TODO throw error if not densities evaluated
+        if self.densities_evaluated == False:
+            raise RuntimeError("Grid.get_cell_corner_densities: Densities must be evaluated on the grid prior to choosing cells.")
+
         # loop over 2^k corners, get densities at each
         corners = []
         for i in range(2**self.dim):

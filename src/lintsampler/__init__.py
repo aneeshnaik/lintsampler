@@ -12,4 +12,4 @@ from importlib.metadata import version, PackageNotFoundError
 
 __version__ = version("lintsampler")
 
-__all__ = ["LintSampler, DensityGrid"]
+__all__ = ["LintSampler", "DensityGrid"]
