@@ -2,6 +2,7 @@ import numpy as np
 from warnings import warn
 from scipy.stats.qmc import QMCEngine, Sobol
 from .grid import DensityGrid
+from .density_structure import DensityStructure
 from .utils import _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
 from .sampling import _grid_sample
 
@@ -376,10 +377,10 @@ class LintSampler:
         # - domain is a list of ditto
         # - domain is a list of: 1D iterables or tuples of 1D iterables
         # - domain is a single 1D iterable / tuple of 1D iterables
-        if isinstance(domain, DensityGrid):
+        if isinstance(domain, DensityStructure):
             self.ngrids = 1
             self.grids = [domain]
-        elif isinstance(domain, list) and _all_are_instances(domain, DensityGrid):
+        elif isinstance(domain, list) and _all_are_instances(domain, DensityStructure):
             self.ngrids = len(domain)
             self.grids = domain
         elif isinstance(domain, list) and not _is_1D_iterable(domain):

@@ -2,9 +2,10 @@ import numpy as np
 from functools import reduce
 from warnings import warn
 from .utils import _is_1D_iterable, _choice
+from .density_structure import DensityStructure
 
 
-class DensityGrid:
+class DensityGrid(DensityStructure):
     """Grid-like object over which density function is evaluated.
 
     ``DensityGrid`` takes a single parameter, ``edges``, and uses it to
@@ -251,7 +252,7 @@ class DensityGrid:
         if _is_1D_iterable(edges):
 
             # store dimensionality (1) and single edgearray and dims
-            self.dim = 1
+            self._dim = 1
             self.edgearrays = [np.array(edges)]
             self._edgeshape = (len(edges),)
 
@@ -260,7 +261,7 @@ class DensityGrid:
         elif isinstance(edges, tuple) and _is_1D_iterable(edges[0]):
             
             # infer dimensionality
-            self.dim = len(edges)
+            self._dim = len(edges)
 
             # loop over dimensions, store edge arrays and dims
             self.edgearrays = []
@@ -290,8 +291,8 @@ class DensityGrid:
                 )
 
         # geometry-related attrs
-        self.mins = np.array([arr[0] for arr in self.edgearrays])
-        self.maxs = np.array([arr[-1] for arr in self.edgearrays])
+        self._mins = np.array([arr[0] for arr in self.edgearrays])
+        self._maxs = np.array([arr[-1] for arr in self.edgearrays])
         self.shape = tuple(d - 1 for d in self._edgeshape)
         self.ncells = np.prod(self.shape)
         self._cell_mins = np.stack(np.meshgrid(*[a[:-1] for a in self.edgearrays], indexing='ij'), axis=-1)
@@ -299,6 +300,22 @@ class DensityGrid:
     
         # density-related attrs (None because densities not yet evaluated)
         self.reset_densities()
+    
+    @property
+    def dim(self):
+        return self._dim
+    
+    @property
+    def mins(self):
+        return self._mins
+
+    @property
+    def maxs(self):
+        return self._maxs
+    
+    @property
+    def total_mass(self):
+        return self._total_mass
 
     def reset_densities(self):
         """Unset density flag and remove density-related attributes.
@@ -310,7 +327,7 @@ class DensityGrid:
         self.densities_evaluated = False
         self.vertex_densities = None
         self.masses = None
-        self.total_mass = None
+        self._total_mass = None
 
     def evaluate(self, pdf, vectorizedpdf=False, pdf_args=(), pdf_kwargs={}):
         """Evaluate the user-provided pdf on grid and set related attributes.
@@ -379,7 +396,7 @@ class DensityGrid:
         self.densities_evaluated = True
         self.vertex_densities = densities
         self.masses = self._calculate_faverages() * self._calculate_volumes()
-        self.total_mass = np.sum(self.masses)
+        self._total_mass = np.sum(self.masses)
     
     def choose_cells(self, u):
         """Given array of u-samples, choose cells; get mins/maxs/densities.
