@@ -267,14 +267,7 @@ def test_no_evaluation_for_choose():
     """Test error raised if no preevaluated densities before attempting to choose cells"""
     grid = DensityGrid(X_EDGES)
     with pytest.raises(RuntimeError):
-        grid.choose(0.5)
-
-
-def test_no_evaluation_for_corner_densities():
-    """Test error raised if no preevaluated densities before attempting to get cell corner densities"""
-    grid = DensityGrid(X_EDGES)
-    with pytest.raises(RuntimeError):
-        grid.get_cell_corner_densities(X_EDGES)
+        grid.choose_cells(np.array([0.1, 0.5, 0.9]))
 
 
 def test_double_evaluation():

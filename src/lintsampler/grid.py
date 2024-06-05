@@ -18,10 +18,9 @@ class DensityGrid:
     (``vertex_densities``) alongside several other new attributes relating
     to the densities/probability masses on the grid. The Boolean flag
     ``densities_evaluated`` switches to ``True`` at this point. After calling
-    this method, several new methods become available: ``choose`` returns
-    random cells weighted by their probabilities, and 
-    ``get_cell_corner_densities`` returns the densities on the corners of given
-    cells.
+    this method, the ``choose_cells`` method becomes available, this choose 
+    random cells weighted by their probabilities and returns their coordinates
+    and corner densities.
  
     See the examples below for the various usage patterns.
 
@@ -144,6 +143,7 @@ class DensityGrid:
       function.
     
       As an example in 1D we can take an unnormalised Gaussian:
+
       >>> pdf = lambda x: np.exp(-x**2)      
       >>> g = DensityGrid(np.linspace(-3, 3, 7))
       >>> g.evaluate(pdf)
@@ -187,11 +187,11 @@ class DensityGrid:
       >>> g.total_mass
       0.9945979872720603
       
-    - Example usage of ``choose`` and ``get_cell_corner_densities`` methods
+    - Example usage of ``choose_cells`` method
       
       Once the ``evaluate`` method has been called (so that the attribute 
-      ``densities_evaluated`` is ``True``), the ``choose`` method can be used
-      to randomly select grid cells (weighted by their masses), given a 1D
+      ``densities_evaluated`` is ``True``), the ``choose_cells`` method can be
+      used to randomly select grid cells (weighted by their masses), given a 1D
       array of uniform samples.
       
       Taking the same 2D grid and PDF as in the previous example:
@@ -200,44 +200,49 @@ class DensityGrid:
       >>> g = DensityGrid((np.linspace(-3, 3, 129), np.linspace(-3, 3, 129)))
       >>> g.evaluate(pdf, vectorizedpdf=True)
       >>> u = np.random.default_rng().uniform(size=10)  
-      >>> cells = g.choose(u)
-      >>> cells
-      array([[70, 89],
-             [72, 36],
-             [46, 41],
-             [67, 41],
-             [74, 92],
-             [77, 60],
-             [38, 56],
-             [83, 40],
-             [69, 64],
-             [82, 49]])
-
-      This returns a 2D array, shaped (10, 2), 10 because we fed in 10 uniform
-      samples and 2 because we have a 2D grid (and bivariate PDF). The integer
-      array elements represent the cell indices along each dimension of the
-      grid.
+      >>> mins, maxs, corners = g.choose_cells(u)
       
-      We can take this array of cells and feed it to the method 
-      ``get_cell_corner_densities`` to get the vertex densities at the corners
-      of the given cells.
+      Let's inspect the returned arrays:
       
-      >>> g.get_cell_corner_densities(cells)
-      (array([0.0680767 , 0.09707593, 0.12093098, 0.05393205, 0.09988883,
-              0.02469491, 0.13291402, 0.04088934, 0.14672783, 0.01712865]),
-       array([0.06479294, 0.09382542, 0.12213264, 0.05247092, 0.10380458,
-              0.025776  , 0.13045465, 0.04401268, 0.1449653 , 0.01703481]),
-       array([0.0655087 , 0.1002186 , 0.12484592, 0.0505471 , 0.09761065,
-              0.02279171, 0.13571763, 0.0416602 , 0.14883847, 0.01888807]),
-       array([0.0623488 , 0.09686286, 0.12608648, 0.04917767, 0.10143709,
-              0.02378948, 0.13320639, 0.04484242, 0.14705059, 0.0187846 ]))
+      >>> mins
+      array([[ 1.546875,  0.703125],
+             [-0.234375, -0.234375],
+             [ 0.      ,  0.84375 ],
+             [ 1.03125 ,  1.359375],
+             [-0.9375  ,  0.      ],
+             [ 0.09375 , -0.9375  ],
+             [-1.453125, -0.046875],
+             [-0.890625, -0.84375 ],
+             [-1.265625, -0.515625],
+             [-1.3125  , -0.84375 ]])
+      >>> maxs
+      array([[ 1.59375 ,  0.75    ],
+             [-0.1875  , -0.1875  ],
+             [ 0.046875,  0.890625],
+             [ 1.078125,  1.40625 ],
+             [-0.890625,  0.046875],
+             [ 0.140625, -0.890625],
+             [-1.40625 ,  0.      ],
+             [-0.84375 , -0.796875],
+             [-1.21875 , -0.46875 ],
+             [-1.265625, -0.796875]])
+      >>> corners
+      (array([0.03757259, 0.15064809, 0.11148847, 0.03712126, 0.10255765,
+              0.10210795, 0.0553122 , 0.074987  , 0.06255463, 0.04711508]),
+       array([0.0363145 , 0.15214504, 0.1070474 , 0.03479141, 0.10244504,
+              0.10657801, 0.055373  , 0.07792656, 0.06401463, 0.04896204]),
+       array([0.03490626, 0.15214504, 0.11136605, 0.03533066, 0.1070474 ,
+              0.10154859, 0.05914606, 0.07809798, 0.06630517, 0.05004977]),
+       array([0.03373746, 0.15365686, 0.10692986, 0.0331132 , 0.10692986,
+              0.10599417, 0.05921108, 0.0811595 , 0.0678527 , 0.05201177]))
 
-      This returns a length-4 tuple of length-10 arrays. 4 because each of the
+      ``mins`` and ``maxs`` are both arrays shaped (10, 2), 10 because we fed in
+      10 uniform samples and 2 because we have a 2D grid (and bivariate PDF). 
+      ``corners`` is a length-4 tuple of length-10 arrays. 4 because each of the
       10 cells has 4 corners. So, the first array contains the densities at
       the 00-corner of each cell, the second array contains the 01-densities,
       the third array gives the 10-densities, and the fourth array gives the
       11-densities.
-      
     """
     def __init__(self, edges):
         
@@ -289,7 +294,9 @@ class DensityGrid:
         self.maxs = np.array([arr[-1] for arr in self.edgearrays])
         self.shape = tuple(d - 1 for d in self._edgeshape)
         self.ncells = np.prod(self.shape)
-
+        self._cell_mins = np.stack(np.meshgrid(*[a[:-1] for a in self.edgearrays], indexing='ij'), axis=-1)
+        self._cell_maxs = np.stack(np.meshgrid(*[a[1:] for a in self.edgearrays], indexing='ij'), axis=-1)
+    
         # density-related attrs (None because densities not yet evaluated)
         self.reset_densities()
 
@@ -373,8 +380,46 @@ class DensityGrid:
         self.vertex_densities = densities
         self.masses = self._calculate_faverages() * self._calculate_volumes()
         self.total_mass = np.sum(self.masses)
+    
+    def choose_cells(self, u):
+        """Given array of u-samples, choose cells; get mins/maxs/densities.
+        
+        Parameters
+        ----------
+        u : 1D array of floats, shape (N,)
+            Array of uniform samples ~ U(0, 1).
+            
+        Returns
+        -------
+        mins : 2D array of floats, shape (N, k)
+            Coordinate vector of first corner of each cell.
+        maxs : 2D array of floats, shape (N, k)
+            Coordinate vector of last corner of each cell.
+        corners : 2^k-tuple of 1D arrays, each length N
+            Densities at corners of given cells. Conventional ordering applies,
+            e.g., in 3D: (f000, f001, f010, f011, f100, f101, f110, f111)
+        """
+        # raise error if densities not pre-evaluated
+        if self.densities_evaluated == False:
+            raise RuntimeError(
+                "DensityGrid.choose_cells:"\
+                "Densities must be evaluated prior to choosing cells."
+            )
 
-    def choose(self, u):
+        # get (N, k) array of cell indices
+        cells = self._choose_indices(u)
+
+        # convert to grid indexing arrays
+        idx = np.split(cells.T, self.dim)
+        idx = tuple([idxi[0] for idxi in idx])
+
+        # cell mins, cell maxs, corner densities for chosen cells        
+        mins = self._cell_mins[idx]
+        maxs = self._cell_maxs[idx]
+        densities = self._get_cell_corner_densities(cells)
+        return mins, maxs, densities
+
+    def _choose_indices(self, u):
         """Given 1D array of uniform samples, return indices of chosen cells.
         
         Parameters
@@ -387,9 +432,6 @@ class DensityGrid:
         cells : 2D array of ints, shape (N, k)
             Grid indices of N chosen cells along the k dimensions of the grid.
         """
-        if self.densities_evaluated == False:
-            raise RuntimeError("Grid.choose: Densities must be evaluated on the grid prior to choosing cells.")
-
         if self.ncells == 1:
             return np.zeros((len(u), self.dim), dtype=np.int32)
             
@@ -403,7 +445,7 @@ class DensityGrid:
         cells = np.stack(np.unravel_index(cells, self.shape), axis=-1)
         return cells
 
-    def get_cell_corner_densities(self, cells):
+    def _get_cell_corner_densities(self, cells):
         """Return densities on 2^k corners of given cells.
 
         Parameters
@@ -417,9 +459,6 @@ class DensityGrid:
             Densities at corners of given cells. Conventional ordering applies,
             e.g., in 3D: (f000, f001, f010, f011, f100, f101, f110, f111)
         """
-        if self.densities_evaluated == False:
-            raise RuntimeError("Grid.get_cell_corner_densities: Densities must be evaluated on the grid prior to choosing cells.")
-
         # loop over 2^k corners, get densities at each
         corners = []
         for i in range(2**self.dim):

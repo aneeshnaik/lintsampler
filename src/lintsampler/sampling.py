@@ -116,19 +116,12 @@ def _grid_sample(grid, u):
         A 2D array of shape (N, k) containing the sampled points. Each row
         represents a sampled point in k-dimensional space.
     """
-    # get indices of grid cells: 2D array (N, k)
-    cells = grid.choose(u[..., -1])
-
-    # get 2^k-tuple of densities at cell corners
-    corners = grid.get_cell_corner_densities(cells)
+    # choose cells, get mins/maxs/corner densities
+    mins, maxs, corners = grid.choose_cells(u[..., -1])
 
     # sample on unit hypercube
     z = _unitsample_kd(*corners, u=u[..., :-1])
 
-    # rescale coordinates (loop over dimensions)
-    for d in range(grid.dim):
-        e = grid.edgearrays[d]
-        c = cells[:, d]
-        z[:, d] = e[c] + np.diff(e)[c] * z[:, d]
-    
+    # rescale coordinates
+    z = mins + (maxs - mins) * z
     return z
