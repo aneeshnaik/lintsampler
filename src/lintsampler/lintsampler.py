@@ -6,7 +6,7 @@ from .density_structures.base import DensityStructure
 from .utils import _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
 from .sampling import _grid_sample
 
-
+# TODO: update docs to allow any DensityStructure
 class LintSampler:
     """Linear interpolant sampler for density function defined on grid(s).
 
