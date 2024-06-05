@@ -1,6 +1,90 @@
 import numpy as np
 
 
+def _get_unit_hypercube_corners(ndim):
+    """Get corners of N-dimensional unit hypercube.
+    
+    An N-dimensional unit hypercube has 2**N corners. This function returns
+    the coordinates of those corners, starting at the origin then iteratively
+    incrementing along each dimension *from last to first*. See example below
+    for illustration.
+
+    Parameters
+    ----------
+    ndim : int
+        Number of dimensions of hypercube.
+
+    Returns
+    -------
+    corners : numpy array, shape (2**ndim, ndim)
+        Coordinates of corners.
+    
+    Example
+    -------
+    >>> get_unit_hypercube_corners(3)
+    array([[0, 0, 0],
+           [0, 0, 1],
+           [0, 1, 0],
+           [0, 1, 1],
+           [1, 0, 0],
+           [1, 0, 1],
+           [1, 1, 0],
+           [1, 1, 1]])
+    """
+    # no. corners
+    Nc = 2**ndim
+    
+    # get binary rep of integers from 0 to Nc, split into digits, stack
+    c = np.stack(
+        [[int(i) for i in np.binary_repr(k, width=ndim)] for k in range(Nc)]
+    )
+    return c
+
+
+def _get_hypercube_corners(mins, maxs):
+    """Get corners of N-d hypercube with given coordinate minima and maxima.
+    
+    An N-dimensional unit hypercube has 2**N corners. This function returns
+    the coordinates of those corners, starting at the origin then iteratively
+    incrementing along each dimension *from last to first*. See example below
+    for illustration.
+
+    Parameters
+    ----------
+    mins : 1D array-like, length N
+        Coordinate minima of N-d hypercube.
+    maxs : 1D array-like, length N
+        Coordinate maxima of N-D hypercube.
+
+    Returns
+    -------
+    corners : numpy array, shape (2**N, N), dtype same as input mins/maxs
+        Coordinates of corners.
+    
+    Example
+    -------
+    >>> get_hypercube_corners([10., 20., 35.], [60., 27., 81.])
+    array([[10., 20., 35.],
+           [10., 20., 81.],
+           [10., 27., 35.],
+           [10., 27., 81.],
+           [60., 20., 35.],
+           [60., 20., 81.],
+           [60., 27., 35.],
+           [60., 27., 81.]])
+    """
+    # cast to numpy arrays if not already
+    mins = np.array(mins)
+    maxs = np.array(maxs)
+    
+    # infer dimensionality
+    ndim = len(mins)
+    
+    # get unit cube corners and scale
+    corners = mins + (maxs-mins) * _get_unit_hypercube_corners(ndim)
+    return corners
+
+
 def _is_1D_iterable(obj):
     """Check if object is 1D iterable (has length but first element doesn't).
     
