@@ -18,15 +18,18 @@ class DensityTree(DensityStructure):
         Coordinate minima along all axes (e.g., bottom-left corner in 2D).
     maxs: 1D array-like, length ndim
         Coordinate maxima along all axes (e.g., top-right corner in 2D).
-    density_fn: callable
+    pdf: callable
         Function to integrate. Should take in coord vector (1D, length ndim) and
         output density at that point (float).
     """
-    def __init__(self, mins, maxs, density_fn, min_openings=0):
+    def __init__(self, mins, maxs, pdf, vectorizedpdf=False, pdf_args=(), pdf_kwargs={}, min_openings=0):
         # save arguments as attrs
         self._mins = np.array(mins)
         self._maxs = np.array(maxs)
-        self.density_fn = density_fn
+        self.pdf = pdf
+        self.vectorizedpdf = vectorizedpdf
+        self.pdf_args = pdf_args
+        self.pdf_kwargs = pdf_kwargs
 
         # infer dimensionality and check mins/maxs shapes make sense
         self._dim = len(mins)
@@ -36,7 +39,7 @@ class DensityTree(DensityStructure):
             raise ValueError("mins and maxs have different lengths.")
 
         # construct density cache grid
-        self._grid = _CacheGrid(mins, maxs, density_fn)
+        self._grid = _CacheGrid(mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs)
 
         # set root cell
         self._root = _TreeCell(None, 0, 0, self._grid)
@@ -279,11 +282,14 @@ class _TreeCell:
 
 
 class _CacheGrid:
-    def __init__(self, mins, maxs, density_fn):
+    def __init__(self, mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs):
         # save arguments as attrs
         self.mins = np.array(mins)
         self.maxs = np.array(maxs)
-        self.density_fn = density_fn
+        self.pdf = pdf
+        self.vectorizedpdf = vectorizedpdf
+        self.pdf_args = pdf_args
+        self.pdf_kwargs = pdf_kwargs
         
         # infer dimensionality
         self.ndim = len(mins)
@@ -291,7 +297,7 @@ class _CacheGrid:
         # set up (currently empty) caches to save density evaluations
         self.caches = {}
         
-        # number of calls to density function
+        # number of calls to density function: are we using this somewhere?
         self.fn_calls = 0
         return
 
@@ -309,11 +315,19 @@ class _CacheGrid:
         # if any corners not in cache, evaluate density fn and cache
         if not m_cached.all():
             pos = self._convert_corners_to_pos(corners[~m_cached], level)
-            new_densities = []
-            for xi in pos:
-                new_densities.append(self.density_fn(xi))
-                self.fn_calls += 1
-            densities[~m_cached] = np.array(new_densities)
+            
+
+            if self.vectorizedpdf:
+                densities[~m_cached] = self.pdf(pos,*self.pdf_args,**self.pdf_kwargs)
+                self.fn_calls += pos.size
+
+            else:
+                new_densities = []
+                for xi in pos:
+                    new_densities.append(self.pdf(xi,*self.pdf_args,**self.pdf_kwargs))
+                    self.fn_calls += 1
+                densities[~m_cached] = np.array(new_densities)
+
             for i, corner in enumerate(corners[~m_cached]):
                 self._cache(corner, level, densities[~m_cached][i])
         return densities
@@ -354,3 +368,4 @@ class _CacheGrid:
                 self.caches[level] = {}
             self.caches[level][corner] = value
         return
+
