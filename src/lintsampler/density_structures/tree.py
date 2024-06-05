@@ -1,9 +1,12 @@
 import numpy as np
 from functools import reduce
-from .density_structure import DensityStructure
-from .utils import _choice, _get_hypercube_corners
+from .base import DensityStructure
+from ..utils import _choice, _get_hypercube_corners
 
-
+#TODO class docstring
+#TODO method docstrings
+#TODO refine by location
+#TODO refine by mass
 class DensityTree(DensityStructure):
     """
 
@@ -20,7 +23,6 @@ class DensityTree(DensityStructure):
         output density at that point (float).
     """
     def __init__(self, mins, maxs, density_fn, min_openings=0):
-        """Initialise AdaptiveRombergTree instance."""
         # save arguments as attrs
         self._mins = np.array(mins)
         self._maxs = np.array(maxs)
@@ -94,7 +96,7 @@ class DensityTree(DensityStructure):
         corners = tuple(corners)
         return mins, maxs, corners
 
-    def refine(self, leaf_tol, tree_tol):
+    def refine_by_error(self, leaf_tol, tree_tol):
         
         leaves = self._leaves
     
