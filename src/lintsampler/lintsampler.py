@@ -1,7 +1,7 @@
 import numpy as np
 from warnings import warn
 from scipy.stats.qmc import QMCEngine, Sobol
-from .grid import DensityGrid
+from .density_grid import DensityGrid
 from .density_structure import DensityStructure
 from .utils import _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
 from .sampling import _grid_sample
