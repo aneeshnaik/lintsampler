@@ -5,23 +5,16 @@ from ..utils import _is_1D_iterable, _choice
 from .base import DensityStructure
 
 #TODO separate inherited and specific attrs in docstring
+#TODO update examples to reflect densities evaluated on init
 class DensityGrid(DensityStructure):
     """Grid-like object over which density function is evaluated.
 
-    ``DensityGrid`` takes a single parameter, ``edges``, and uses it to
-    construct a rectilinear grid. ``edges`` should contain one or k sequences of
-    numbers representing the `edges` of a one- or k-dimensional grid. The given
-    edges need not be evenly spaced, but should be monotonically increasing.
-    After construction, various grid-related attributes become available.
-
-    The key method of the class is ``evaluate``, in which a given PDF is
-    evaluated on the `vertices` of the grid and stored as an attribute
-    (``vertex_densities``) alongside several other new attributes relating
-    to the densities/probability masses on the grid. The Boolean flag
-    ``densities_evaluated`` switches to ``True`` at this point. After calling
-    this method, the ``choose_cells`` method becomes available, this choose 
-    random cells weighted by their probabilities and returns their coordinates
-    and corner densities.
+    ``DensityGrid`` uses the parameter ``edges`` to construct a rectilinear
+    grid. ``edges`` should contain one or k sequences of numbers representing
+    the `edges` of a one- or k-dimensional grid. The given edges need not be
+    evenly spaced, but should be monotonically increasing. After the grid is
+    constructed, the given PDF function is evaluated on the `vertices` of the
+    grid.
  
     See the examples below for the various usage patterns.
 
@@ -35,6 +28,26 @@ class DensityGrid(DensityStructure):
         k-dimensional grid with dimensionality equal to the length of the tuple.
         So, a kD grid with (N1 x N2 x ... x Nk) cells should take a length-k
         tuple, with arrays length N1+1, N2+1 etc.
+    pdf : function
+        Probability density function to evaluate on grid. Function should
+        take coordinate vector (or batch of vectors if vectorized; see
+        `vectorizedpdf` parameter) and return (unnormalised) density (or
+        batch of densities). Additional arguments can be passed to the
+        function via `pdf_args` and `pdf_kwargs` parameters.
+    vectorizedpdf : bool, optional
+        if True, assumes that the pdf function is vectorized, i.e., it
+        accepts  (..., k)-shaped batches of coordinate vectors and returns
+        (...)-shaped batches of densities. If False, assumes that the pdf
+        function simply accepts (k,)-shaped coordinate vectors and returns
+        single densities. Default is False.
+    pdf_args : tuple, optional
+        Additional positional arguments to pass to pdf function; function
+        call is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty
+        tuple (no additional positional arguments).
+    pdf_kwargs : dict, optional
+        Additional keyword arguments to pass to pdf function; function call
+        is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict
+        (no additional keyword arguments).
 
     Attributes
     ---------- 
@@ -54,22 +67,16 @@ class DensityGrid(DensityStructure):
     maxs : ``numpy`` array
         1D array (length ``dim``), giving upper coordinate bound of grid
         along each dimension.
-    densities_evaluated : bool
-        Flag indicating whether density function has been evaluated on grid (via
-        ``evaluate`` method) yet. 
-    vertex_densities : {``None``, ``numpy`` array}
-        If ``densities_evaluated``, k-dimensional array giving densities at
-        vertices of grid. Shape is (N1+1, N2+1, ...) if grid has (N1, N2, ...)
-        cells along each dimension. ``None`` if not ``densities_evaluated``.
-    masses : {``None``, ``numpy`` array}
-        If ``densities_evaluated``, k-dimensional array of probability masses of
-        grid cells. Shape is equal to grid shape (``shape`` attribute). Masses
-        are calculated according to trapezoid rule, i.e., cell volumes
-        multiplied by average vertex densities. ``None`` if not 
-        ``densities_evaluated``.
-    total_mass : {``None``, float}
-        If ``densities_evaluated``, total probability mass of this grid; sum over
-        ``masses`` array. ``None`` if not ``densities_evaluated``.
+    vertex_densities : ``numpy`` array
+        k-dimensional array giving densities at vertices of grid. Shape is
+        (N1+1, N2+1, ...) if grid has (N1, N2, ...) cells along each dimension.
+    masses : ``numpy`` array
+        k-dimensional array of probability masses of grid cells. Shape is equal
+        to grid shape (``shape`` attribute). Masses are calculated according to
+        trapezoid rule, i.e., cell volumes multiplied by average vertex
+        densities.
+    total_mass : float
+        Total probability mass of this grid; summed over ``masses`` array.
 
     Examples
     --------
@@ -245,7 +252,7 @@ class DensityGrid(DensityStructure):
       the third array gives the 10-densities, and the fourth array gives the
       11-densities.
     """
-    def __init__(self, edges):
+    def __init__(self, edges, pdf, vectorizedpdf=False, pdf_args=(), pdf_kwargs={}):
         
         # 1D case: cells is 1D iterable (array, tuple, list)
         # e.g. cells = np.linspace(-4,4,50)
@@ -298,8 +305,8 @@ class DensityGrid(DensityStructure):
         self._cell_mins = np.stack(np.meshgrid(*[a[:-1] for a in self.edgearrays], indexing='ij'), axis=-1)
         self._cell_maxs = np.stack(np.meshgrid(*[a[1:] for a in self.edgearrays], indexing='ij'), axis=-1)
     
-        # density-related attrs (None because densities not yet evaluated)
-        self.reset_densities()
+        # evaluate PDF (set relevant attrs)
+        self._evaluate_pdf(pdf, vectorizedpdf, pdf_args, pdf_kwargs)
     
     @property
     def dim(self):
@@ -316,53 +323,62 @@ class DensityGrid(DensityStructure):
     @property
     def total_mass(self):
         return self._total_mass
-
-    def reset_densities(self):
-        """Unset density flag and remove density-related attributes.
-
+    
+    def choose_cells(self, u):
+        """Choose cells given 1D array of uniform samples.
+        
+        Method enforced by base class ``DensityStructure``.
+        
+        Parameters
+        ----------
+        u : 1D array of floats, shape (N,)
+            Array of uniform samples ~ U(0, 1).
+        
         Returns
         -------
-        None
+        mins : 2D array of floats, shape (N, k)
+            Coordinate vector of first corner of each cell.
+        maxs : 2D array of floats, shape (N, k)
+            Coordinate vector of last corner of each cell.
+        corners : 2^k-tuple of 1D arrays, each length N
+            Densities at corners of given cells. Conventional ordering applies,
+            e.g., in 3D: (f000, f001, f010, f011, f100, f101, f110, f111)
         """
-        self.densities_evaluated = False
-        self.vertex_densities = None
-        self.masses = None
-        self._total_mass = None
+        # get (N, k) array of cell indices
+        cells = self._choose_indices(u)
 
-    def evaluate(self, pdf, vectorizedpdf=False, pdf_args=(), pdf_kwargs={}):
+        # convert to grid indexing arrays
+        idx = np.split(cells.T, self.dim)
+        idx = tuple([idxi[0] for idxi in idx])
+
+        # cell mins, cell maxs, corner densities for chosen cells        
+        mins = self._cell_mins[idx]
+        maxs = self._cell_maxs[idx]
+        densities = self._get_cell_corner_densities(cells)
+        return mins, maxs, densities
+
+    def _evaluate_pdf(self, pdf, vectorizedpdf, pdf_args, pdf_kwargs):
         """Evaluate the user-provided pdf on grid and set related attributes.
         
         Parameters
         ----------
         pdf : function
-            Probability density function to evaluate on grid. Function should
-            take coordinate vector (or batch of vectors if vectorized; see
-            `vectorizedpdf` parameter) and return (unnormalised) density (or
-            batch of densities). Additional arguments can be passed to the
-            function via `pdf_args` and `pdf_kwargs` parameters.
-        vectorizedpdf : bool, optional
-            if True, assumes that the pdf function is vectorized, i.e., it
-            accepts  (..., k)-shaped batches of coordinate vectors and returns
-            (...)-shaped batches of densities. If False, assumes that the pdf
-            function simply accepts (k,)-shaped coordinate vectors and returns
-            single densities. Default is False.
-        pdf_args : tuple, optional
-            Additional positional arguments to pass to pdf function; function
-            call is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty
-            tuple (no additional positional arguments).
-        pdf_kwargs : dict, optional
-            Additional keyword arguments to pass to pdf function; function call
-            is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict
-            (no additional keyword arguments).
-        
+            Probability density function to evaluate on grid. See corresponding
+            parameter in class constructor.
+        vectorizedpdf : bool
+            Whether pdf function is vectorized. See corresponding parameter in
+            class constructor.
+        pdf_args : tuple
+            Additional positional arguments to pass to pdf function. See
+            corresponding parameter in class constructor.
+        pdf_kwargs : dict
+            Additional keyword arguments to pass to pdf function. See
+            corresponding parameter in class constructor.
+
         Returns
         -------
         None
         """
-        if self.densities_evaluated:
-            warn("Grid.evaluate: PDF being unnecessarily evaluated again.")
-            self.reset_densities()
-
         # number of vertices in grid
         npts = np.prod(self._edgeshape)
         
@@ -393,50 +409,9 @@ class DensityGrid(DensityStructure):
         densities = densities.reshape(self._edgeshape)
 
         # store attributes
-        self.densities_evaluated = True
         self.vertex_densities = densities
         self.masses = self._calculate_faverages() * self._calculate_volumes()
         self._total_mass = np.sum(self.masses)
-    
-    def choose_cells(self, u):
-        """Choose cells given 1D array of uniform samples.
-        
-        Method enforced by base class ``DensityStructure``.
-        
-        Parameters
-        ----------
-        u : 1D array of floats, shape (N,)
-            Array of uniform samples ~ U(0, 1).
-        
-        Returns
-        -------
-        mins : 2D array of floats, shape (N, k)
-            Coordinate vector of first corner of each cell.
-        maxs : 2D array of floats, shape (N, k)
-            Coordinate vector of last corner of each cell.
-        corners : 2^k-tuple of 1D arrays, each length N
-            Densities at corners of given cells. Conventional ordering applies,
-            e.g., in 3D: (f000, f001, f010, f011, f100, f101, f110, f111)
-        """
-        # raise error if densities not pre-evaluated
-        if self.densities_evaluated == False:
-            raise RuntimeError(
-                "DensityGrid.choose_cells:"\
-                "Densities must be evaluated prior to choosing cells."
-            )
-
-        # get (N, k) array of cell indices
-        cells = self._choose_indices(u)
-
-        # convert to grid indexing arrays
-        idx = np.split(cells.T, self.dim)
-        idx = tuple([idxi[0] for idxi in idx])
-
-        # cell mins, cell maxs, corner densities for chosen cells        
-        mins = self._cell_mins[idx]
-        maxs = self._cell_maxs[idx]
-        densities = self._get_cell_corner_densities(cells)
-        return mins, maxs, densities
 
     def _choose_indices(self, u):
         """Given 1D array of uniform samples, return indices of chosen cells.
