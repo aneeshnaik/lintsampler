@@ -1,6 +1,18 @@
 import numpy as np
 
 
+def _get_grid_origin_from_cell_idx(idx, level, dim):
+    #TODO docstring
+    #TODO promote assertion to Error
+    assert idx in range(2**(level * dim))
+    if level == 0:
+        return np.zeros(dim, dtype=np.int64)
+    else:
+        parent_idx = idx // 2**dim
+        orthant = np.unravel_index(idx % 2**dim, [2] * dim)
+        return 2 * _get_grid_origin_from_cell_idx(parent_idx, level-1, dim) + orthant
+
+
 def _get_unit_hypercube_corners(ndim):
     """Get corners of N-dimensional unit hypercube.
     
