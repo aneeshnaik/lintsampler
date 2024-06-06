@@ -105,8 +105,6 @@ class DensityTree(DensityStructure):
             leaves = new_leaves        
         self.leaves = leaves
 
-        self.densities_evaluated = True
-
     @property
     def dim(self):
         return self._dim

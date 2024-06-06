@@ -192,7 +192,7 @@ class LintSampler:
            [3.56093155e+00, 1.48548481e+02],
            [1.31163401e+00, 1.59335676e+02]])
 
-    This returgns a 2D array, shape (``N``, k): the ``N`` k-D
+    This returns a 2D array, shape (``N``, k): the ``N`` k-D
     samples within the grid.
 
     5. A ``DensityGrid`` instance may also be passed to any of the above examples.
@@ -213,6 +213,21 @@ class LintSampler:
         pdf=None, vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
         seed=None, qmc=False, qmc_engine=None
     ):
+        
+        # check given PDF is callable
+        if pdf:
+            if not callable(pdf):
+                raise TypeError(
+                    "LintSampler.__init__: " \
+                    f"Given PDF is not callable."
+                )
+        else:
+            if vectorizedpdf or pdf_args or pdf_kwargs:
+                warn(
+                    "LintSampler.__init__: " \
+                    f"PDF configuration setting given but no PDF provided."
+                )
+
         # set pdf-related parameters as attributes
         self.pdf = pdf
         self.vectorizedpdf = vectorizedpdf
@@ -221,27 +236,7 @@ class LintSampler:
 
         # set up the sampling grids under the hood
         self._set_grids(domain=domain)
-        
-        # if given, evaluate PDF on grids, else check grids already evaluated
-        if self.pdf:
-            if not callable(self.pdf):
-                raise TypeError(
-                    "LintSampler.__init__: " \
-                    f"Given PDF is not callable."
-                )
-            self._evaluate_pdf()
-        else:
-            if self.vectorizedpdf or self.pdf_args or self.pdf_kwargs:
-                warn(
-                    "LintSampler.__init__: " \
-                    f"PDF configuration setting given but no PDF provided."
-                )
-            if not self._check_grids_evaluated():
-                raise ValueError(
-                    "LintSampler.__init__: " \
-                    f"No densities pre-evaluated on grids and no PDF provided."
-                )
-  
+
         # configure random state according to given random seed and QMC params
         self._set_random_state(seed, qmc, qmc_engine)
 
@@ -349,16 +344,7 @@ class LintSampler:
         """
         # reset grid(s)
         self._set_grids(domain=domain)
-        
-        # evaluate PDF on new grids / check grids already evaluated
-        if self.pdf:
-            self._evaluate_pdf()
-        else:
-            if not self._check_grids_evaluated():
-                raise ValueError(
-                    "LintSampler.__init__: " \
-                    f"No densities pre-evaluated on grids and no PDF provided."
-                )
+
 
     def _set_grids(self, domain):
         """Configure the grid(s) for sampling.
@@ -380,10 +366,13 @@ class LintSampler:
         if isinstance(domain, DensityStructure):
             self.ngrids = 1
             self.grids = [domain]
+            #TODO: warn if PDF not none
         elif isinstance(domain, list) and _all_are_instances(domain, DensityStructure):
             self.ngrids = len(domain)
             self.grids = domain
+            #TODO: warn if PDF not none
         elif isinstance(domain, list) and not _is_1D_iterable(domain):
+            #TODO: raise error if PDF none
             # check all list items are same sort of thing
             if not _all_are_instances(domain, type(domain[0])):
                 raise TypeError(
@@ -391,10 +380,18 @@ class LintSampler:
                     f"List members of different types"
                 )
             self.ngrids = len(domain)
-            self.grids = [DensityGrid(edges=ci) for ci in domain]
+            gargs = dict(
+                pdf=self.pdf, vectorizedpdf=self.vectorizedpdf,
+                pdf_args=self.pdf_args, pdf_kwargs=self.pdf_kwargs
+            )
+            self.grids = [DensityGrid(edges=ci, **gargs) for ci in domain]
         else:
+            #TODO: raise error if PDF none
             self.ngrids = 1
-            self.grids = [DensityGrid(edges=domain)]
+            self.grids = [
+                DensityGrid(edges=domain, pdf=self.pdf, vectorizedpdf=self.vectorizedpdf,
+                            pdf_args=self.pdf_args, pdf_kwargs=self.pdf_kwargs)
+            ]
 
         # get dimensionality of problem from first grid
         self.dim = self.grids[0].dim
@@ -421,31 +418,6 @@ class LintSampler:
                         "LintSampler._set_grids: " \
                         f"Grids {i} and {j} spatially overlapping."
                     )
-
-    def _evaluate_pdf(self):
-        """Loop over ``DensityGrid`` instances and evaluate PDF on each.
-
-        Returns
-        -------
-        None
-        """
-        for grid in self.grids:
-            grid.evaluate(
-                self.pdf, self.vectorizedpdf, self.pdf_args, self.pdf_kwargs
-            )
-            
-    def _check_grids_evaluated(self):
-        """Loop over grids and check densities already evaluated.
-
-        Returns
-        -------
-        grids_evaluated : bool
-            Whether all ``self.grids`` have densities already evaluated.
-        """
-        for grid in self.grids:
-            if not grid.densities_evaluated:
-                return False
-        return True
 
     def _set_random_state(self, seed, qmc, qmc_engine):
         """Configure random number generators and set as attributes.
