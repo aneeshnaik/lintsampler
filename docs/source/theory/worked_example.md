@@ -69,9 +69,7 @@ Let's zoom in on the cell we chose above.
 :align: center
 ```
 
-The block fill from the previous figure has been replaced with a colour gradient, showing the bilinear interpolant between the four (labelled) corner densities.
-
-**FRONTIER**
+The block fill from the previous figure has been replaced with a colour gradient, showing the bilinear interpolant between the four (labelled) corner densities
 
 Actually, we don't directly sample from this distribution, but first transform to coordinates $(z_0, z_1)$ so that the cell becomes the unit square. On that domain, the (properly normalised) probability distribution that we're sampling from is
 
