@@ -3,60 +3,108 @@ from functools import reduce
 from .base import DensityStructure
 from ..utils import _choice, _get_hypercube_corners
 
-#TODO class docstring
-#TODO method docstrings
 #TODO refine by location
-#TODO refine by mass
 class DensityTree(DensityStructure):
-    """
+    """Tree-like object over which density function is evaluated.
 
-    ***LONGER DESCRIPTION TO GO HERE***
+    #TODO extended description
     
     Parameters
     ----------
-    mins: 1D array-like, length ndim
-        Coordinate minima along all axes (e.g., bottom-left corner in 2D).
-    maxs: 1D array-like, length ndim
-        Coordinate maxima along all axes (e.g., top-right corner in 2D).
-    pdf: callable
-        Function to integrate. Should take in coord vector (1D, length ndim) and
-        output density at that point (float).
+    mins : 1D array-like
+        For k-dimensional structure, length-k array giving coordinate minima
+        along all axes (e.g., bottom-left corner in 2D).
+    maxs : 1D array-like
+        For k-dimensional structure, length-k array giving coordinate maxima
+        along all axes (e.g., top-right corner in 2D).
+    pdf : function
+        Probability density function to evaluate on grid. Function should
+        take coordinate vector (or batch of vectors if vectorized; see
+        `vectorizedpdf` parameter) and return (unnormalised) density (or
+        batch of densities). Additional arguments can be passed to the
+        function via `pdf_args` and `pdf_kwargs` parameters.
+    vectorizedpdf : bool, optional
+        if True, assumes that the pdf function is vectorized, i.e., it
+        accepts  (..., k)-shaped batches of coordinate vectors and returns
+        (...)-shaped batches of densities. If False, assumes that the pdf
+        function simply accepts (k,)-shaped coordinate vectors and returns
+        single densities. Default is False.
+    pdf_args : tuple, optional
+        Additional positional arguments to pass to pdf function; function
+        call is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty
+        tuple (no additional positional arguments).
+    pdf_kwargs : dict, optional
+        Additional keyword arguments to pass to pdf function; function call
+        is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict
+        (no additional keyword arguments).
+    min_openings : int, optional
+        Number of full tree openings to perform on initialisation. This is
+        distinct from any further openings that happen on calling a refinement
+        method.
+
+    Attributes
+    ----------
+    mins : 1D array-like
+        See corresponding parameter in constructor. Enforced by base class
+        ``DensityStructure``.
+    maxs : 1D array-like
+        See corresponding parameter in constructor. Enforced by base class
+        ``DensityStructure``.
+    dim : int
+        Dimensionality of structure. Enforced by base class
+        ``DensityStructure``.
+    total_mass : float
+        Total probability mass of structure, summed over all leaves in tree.
+        Enforced by base class ``DensityStructure``.
+    root : ``TreeCell``
+        Root cell of tree.
+    leaves : list
+        List of ``TreeCell`` instances representing leaves of tree.
+    
+    Examples
+    --------
+    #TODO
     """
-    def __init__(self, mins, maxs, pdf, vectorizedpdf=False, pdf_args=(), pdf_kwargs={}, min_openings=0):
-        # save arguments as attrs
+    def __init__(
+        self, mins, maxs, pdf,
+        vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
+        min_openings=0
+    ):
+        # check mins/maxs shapes make sense
+        if mins.ndim != 1:
+            raise ValueError(
+                "DensityTree.__init__: Need one-dimensional array of minima."
+            )
+        if maxs.ndim != 1:
+            raise ValueError(
+                "DensityTree.__init__: Need one-dimensional array of maxima."
+            )
+        if len(maxs) != len(mins):
+            raise ValueError(
+                "DensityTree.__init__: mins and maxs have different lengths."
+            )
+
+        # save mins/maxs/dim as private attrs (made public via properties)
         self._mins = np.array(mins)
         self._maxs = np.array(maxs)
-        self.pdf = pdf
-        self.vectorizedpdf = vectorizedpdf
-        self.pdf_args = pdf_args
-        self.pdf_kwargs = pdf_kwargs
-
-        # infer dimensionality and check mins/maxs shapes make sense
         self._dim = len(mins)
-        if self.mins.ndim != 1:
-            raise ValueError("Need one-dimensional array of minima.")
-        if len(maxs) != self._dim:
-            raise ValueError("mins and maxs have different lengths.")
 
-        # construct density cache grid
-        self._grid = _CacheGrid(mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs)
+        # construct density cache
+        self._cache = _GridCache(mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs)
 
         # set root cell
-        self._root = _TreeCell(None, 0, 0, self._grid)
+        self.root = _TreeCell(parent=None, idx=0, level=0, grid=self._cache)
         
         # full openings
-        leaves = [self._root]
-        for i in range(min_openings):
+        leaves = [self.root]
+        for _ in range(min_openings):
             new_leaves = []
             for leaf in leaves:
                 leaf.create_children()
                 new_leaves += list(leaf.children)
-            leaves = new_leaves
-            leaf_masses = [leaf.mass_raw for leaf in leaves]
-            m0 = np.sum(leaf_masses)
-            print(f"Full opening {i}. {len(leaves)} leaves on tree. Total raw={m0}")        
-        self._leaves = leaves
-        
+            leaves = new_leaves        
+        self.leaves = leaves
+
         self.densities_evaluated = True
         return
 
@@ -78,71 +126,144 @@ class DensityTree(DensityStructure):
     
     @property
     def _leaf_masses(self):
-        return np.array([leaf.mass_raw for leaf in self._leaves])
+        return np.array([leaf.mass_raw for leaf in self.leaves])
 
     def choose_cells(self, u):
+        """Choose cells given 1D array of uniform samples.
         
+        Method enforced by base class ``DensityStructure``.
+        
+        Parameters
+        ----------
+        u : 1D array of floats, shape (N,)
+            Array of uniform samples ~ U(0, 1).
+        
+        Returns
+        -------
+        mins : 2D array of floats, shape (N, k)
+            Coordinate vector of first corner of each cell.
+        maxs : 2D array of floats, shape (N, k)
+            Coordinate vector of last corner of each cell.
+        corners : 2^k-tuple of 1D arrays, each length N
+            Densities at corners of given cells. Conventional ordering applies,
+            e.g., in 3D: (f000, f001, f010, f011, f100, f101, f110, f111)
+        """
+        # flatten leaf masses into probability array
         p = self._leaf_masses / self.total_mass
+        
+        # choose leaf indices; idx: 1D (N,)
         idx = _choice(p, u)
         
+        # loop over leaves, get mins/maxes corners
         N = len(u)
-        
         mins = np.zeros((N, self._dim))
         maxs = np.zeros((N, self._dim))
         corners = np.zeros((2**self._dim, N))
         for i in range(N):
-            leaf = self._leaves[idx[i]]
+            leaf = self.leaves[idx[i]]
             mins[i] = leaf.x
             maxs[i] = leaf.x + leaf.dx
             for j in range(2**self._dim):
                 corners[j][i] = leaf.corner_densities[j]
+                
+        # cast corner array into tuple
         corners = tuple(corners)
+
         return mins, maxs, corners
 
-    def refine_by_error(self, leaf_tol, tree_tol):
+    def refine_by_error(self, leaf_tol, tree_tol, verbose=False):
+        """Refine the tree by opening leaves with large estimated mass errors.
+
+        Refinement uses a strategy based on Romberg integration, and happens
+        in two stages. In the first stage, the tree leaves are repeatedly looped
+        over and opened if their individual 'errors' (estimated from the
+        difference between the last two Romberg-integrated masses) are above the
+        given tolerance threshold. In the second stage, the most erroneous leaf
+        on the tree is repeatedly found and opened until the total error on the
+        tree is below the given threshold. 
+
+        Parameters
+        ----------
+        leaf_tol : float
+            Individual leaf error tolerance level used in the first refinement
+            loop. This is a *fractional* error, i.e., a leaf is opened if
+            the leaf's mass error divided by the leaf's mass is above this
+            threshold.
+        tree_tol : float
+            Total tree error tolerance level used in the second refinement
+            loop. This is a *fractional* error, i.e., a leaf is opened if
+            the tree's total mass error divided by the tree's total mass is
+            above this threshold.
+        verbose : bool, optional
+            If True, print messages at every loop iteration. Default: False. 
+
+        Returns
+        -------
+        None
+        """
+        # raise error if only leaf is root (i.e. no full openings on init)
+        if len(self.leaves) == 1:
+            raise RuntimeError(
+                "DensityTree.refine_by_error: "\
+                "Romberg refinement strategy needs at least two tree levels "\
+                "to estimate mass errors. Instantiate tree with min_openings>0."
+            )
+            
+        if verbose:
+            print(f"Pre-loop: {len(self.leaves)} leaves on tree. Total mass={self.total_mass}")
         
-        leaves = self._leaves
-    
+        # LEAF LOOP:
+        # repeatedly loop over leaves until each leaf has converged Romberg mass
         leaves_converged = False
-        iter_counter = 0
+        counter = 0
         while not leaves_converged:
-            iter_counter += 1
-            m_tot = np.sum([leaf.mass_romberg for leaf in leaves])
-            print(f"Leaf iteration {iter_counter}: {len(leaves)} leaves on tree. Total mass={m_tot}")
+            counter += 1
             new_leaves = []
             leaves_converged = True
-            for leaf in leaves:
-                if np.abs(np.diff(leaf.romberg_estimates)[-1]) > leaf_tol * leaf.mass_romberg:
+            for leaf in self.leaves:
+                err = np.abs(np.diff(leaf.romberg_estimates)[-1])
+                if err > leaf_tol * leaf.mass_romberg:
                     leaves_converged = False
                     leaf.create_children()
                     new_leaves += list(leaf.children)
-                    m_tot -= leaf.mass_romberg
-                    m_tot += np.sum([child.mass_romberg for child in leaf.children])
                 else:
                     new_leaves.append(leaf)
-            leaves = new_leaves      
+            self.leaves = new_leaves
+            if verbose:
+                print(f"End of leaf iteration {counter}: {len(self.leaves)} leaves on tree. Total mass={self.total_mass}")
 
+        # TREE LOOP:
+        # repeatedly open most erroneous leaf in tree until whole tree converged
         tree_converged = False
-        iter_counter = 0
+        counter = 0
         while not tree_converged:
-            iter_counter += 1
-            m_tot = np.sum([leaf.mass_romberg for leaf in leaves])
-            errors_sq = np.array([(leaf.mass_romberg - leaf.mass_raw)**2 for leaf in leaves])
-            err_rms = np.sqrt(np.average(errors_sq))
-            err_tot = np.sqrt(np.sum(errors_sq))
+            counter += 1
+
+            # total romberg mass
+            m_tot = np.sum([leaf.mass_romberg for leaf in self.leaves])
+            
+            # leaf errors            
+            errs_sq = np.array([(leaf.mass_romberg - leaf.mass_raw)**2 for leaf in self.leaves])
+            err_tot = np.sqrt(np.sum(errs_sq))
             if err_tot / m_tot < tree_tol:
                 tree_converged = True
-            print(f"Tree iteration {iter_counter}: {len(leaves)} leaves on tree. Total mass={m_tot}. RMS error={err_rms}. Total error={err_tot}")
             
-            ind = np.argmax(errors_sq)
-            leaf = leaves.pop(ind)
+            # open most erroneous leaf
+            ind = np.argmax(errs_sq)
+            leaf = self.leaves.pop(ind)
             leaf.create_children()
-            leaves += list(leaf.children)
-        
-        self._leaves = leaves
+            self.leaves += list(leaf.children)
+            if verbose:
+                print(
+                    f"End of tree iteration {counter}: "\
+                    f"{len(self.leaves)} leaves on tree. "\
+                    f"Total mass={self.total_mass}. "\
+                    f"Fractional error={err_tot / m_tot}."
+                )
+    
         return
 
-    def _get_leaf_at_pos(self, pos):
+    def get_leaf_at_pos(self, pos):
         """Find leaf cell which contains given position.
         
         Walk down the tree until at leaf cell which contains given position.
@@ -154,14 +275,18 @@ class DensityTree(DensityStructure):
 
         Returns
         -------
-        cell : TreeCell instance
+        cell : TreeCell
             Leaf cell containing given position.        
         """
-        # cast position to numpy array, check shape makes sense
+        # cast position to numpy array
         pos = np.array(pos)
+
+        # check shape makes sense
         if pos.shape != (self._dim,):
-            s = pos.shape
-            raise TypeError(f"Shape of input pos: {s} does not make sense.")
+            raise ValueError(
+                "DensityTree.get_leaf_at_pos:"\
+                f"Shape of input pos: {pos.shape} does not make sense."
+            )
 
         # rescale position to unit cube, check falls inside tree        
         rpos = (pos - self.mins) / (self.maxs - self.mins)
@@ -281,7 +406,7 @@ class _TreeCell:
         return estimates
 
 
-class _CacheGrid:
+class _GridCache:
     def __init__(self, mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs):
         # save arguments as attrs
         self.mins = np.array(mins)

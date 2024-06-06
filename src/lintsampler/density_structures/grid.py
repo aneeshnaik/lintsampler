@@ -4,7 +4,7 @@ from warnings import warn
 from ..utils import _is_1D_iterable, _choice
 from .base import DensityStructure
 
-
+#TODO separate inherited and specific attrs in docstring
 class DensityGrid(DensityStructure):
     """Grid-like object over which density function is evaluated.
 
@@ -399,13 +399,15 @@ class DensityGrid(DensityStructure):
         self._total_mass = np.sum(self.masses)
     
     def choose_cells(self, u):
-        """Given array of u-samples, choose cells; get mins/maxs/densities.
+        """Choose cells given 1D array of uniform samples.
+        
+        Method enforced by base class ``DensityStructure``.
         
         Parameters
         ----------
         u : 1D array of floats, shape (N,)
             Array of uniform samples ~ U(0, 1).
-            
+        
         Returns
         -------
         mins : 2D array of floats, shape (N, k)
