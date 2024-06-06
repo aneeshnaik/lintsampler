@@ -1,7 +1,7 @@
 import numpy as np
 from functools import reduce
 from .base import DensityStructure
-from ..utils import _choice, _get_hypercube_corners
+from ..utils import _choice, _get_hypercube_corners, _get_grid_origin_from_cell_idx
 
 #TODO refine by location
 class DensityTree(DensityStructure):
@@ -92,10 +92,10 @@ class DensityTree(DensityStructure):
         self.batch = batch
 
         # construct density cache
-        self._cache = _GridCache(mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs)
+        gc = _GridCache(mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs)
 
         # set root cell
-        self.root = _TreeCell(parent=None, idx=0, level=0, grid=self._cache, usecache=self._usecache)
+        self.root = _TreeCell(parent=None, idx=0, level=0, grid=gc, usecache=self._usecache)
         
         # full openings
         leaves = [self.root]
@@ -106,9 +106,6 @@ class DensityTree(DensityStructure):
                 new_leaves += list(leaf.children)
             leaves = new_leaves        
         self.leaves = leaves
-
-        self.densities_evaluated = True
-        return
 
     @property
     def dim(self):
@@ -262,8 +259,6 @@ class DensityTree(DensityStructure):
                     f"Total mass={self.total_mass}. "\
                     f"Fractional error={err_tot / m_tot}."
                 )
-    
-        return
 
     def get_leaf_at_pos(self, pos):
         """Find leaf cell which contains given position.
@@ -316,7 +311,7 @@ class _TreeCell:
     def __init__(self, parent, idx, level, grid, hold_eval=False, usecache=True):
         
         # check cell_idx in appropriate range for level
-        assert idx in range(2**(level * grid.ndim))
+        assert idx in range(2**(level * grid.dim))
         
         # save arguments as attrs
         self.parent = parent
@@ -326,14 +321,14 @@ class _TreeCell:
         self.usecache = usecache
         
         # store *real* (not grid) origin and real span of cell, calculate volume
-        self.x = grid._convert_corners_to_pos(self._get_origin(), self.level)
+        go = _get_grid_origin_from_cell_idx(self.idx, self.level, self.grid.dim)
+        self.x = grid.convert_corners_to_pos(go, self.level)
         self.dx = (grid.maxs - grid.mins) / 2**self.level
         self.vol = np.prod(self.dx)
         
         if hold_eval:
-            # create a list of corners we need
-            self.positions = self.grid._convert_corners_to_pos(self._get_corners(), self.level)
-            return
+            # get the *real* (not grid) vertices
+            self.positions = grid.convert_corners_to_pos(self._get_grid_corners(), self.level)
             
         else:
             self._evaluate_cell()
@@ -359,7 +354,7 @@ class _TreeCell:
     
     def _evaluate_cell(self):
         # calculate corner densities
-        self.corner_densities = self.grid.eval(self._get_corners(), self.level, self.usecache)
+        self.corner_densities = self.grid.eval(self._get_grid_corners(), self.level, self.usecache)
         
         # trapezoid mass = volume * average(density)
         self.mass_raw = self.vol * np.average(self.corner_densities)
@@ -375,8 +370,8 @@ class _TreeCell:
 
         if batch:
             # create structure for the verticies to be stored
-            _nverticies = 2**(self.grid.ndim)
-            allverticies = np.zeros([_nverticies**2,self.grid.ndim])
+            _nverticies = 2**(self.grid.dim)
+            allverticies = np.zeros([_nverticies**2,self.grid.dim])
 
             # create cells; get positions to batch evaluate
             for cellnumber,idx in enumerate(self._get_child_ids()):
@@ -402,7 +397,6 @@ class _TreeCell:
                 children.append(_TreeCell(self, idx, self.level + 1, self.grid, usecache=self.usecache))
         
         self.children = tuple(children)
-        return
     
     def interpolate_pos(self, pos):
         return self._interpolate_unitcube((pos - self.x) / self.dx)
@@ -410,31 +404,28 @@ class _TreeCell:
     def estimate_descendant_mass(self, idx, level):
         midpt = self._get_descendant_midpoint(idx, level)
         fmid = self._interpolate_unitcube(midpt)
-        return fmid * self.vol / 2**((level - self.level) * self.grid.ndim)
+        return fmid * self.vol / 2**((level - self.level) * self.grid.dim)
     
     def _interpolate_unitcube(self, rescaled_pos):
-        d1 = np.ones(self.grid.ndim) - rescaled_pos
+        d1 = np.ones(self.grid.dim) - rescaled_pos
         d0 = rescaled_pos
         dx = reduce(np.outer, list(np.stack((d1, d0), axis=-1))).flatten()
         return np.sum(self.corner_densities * dx)
     
-    def _get_origin(self):
-        return self.grid.get_origin_from_cell_idx(self.idx, self.level)
-    
-    def _get_corners(self):
-        mins = self._get_origin()
+    def _get_grid_corners(self):
+        mins = _get_grid_origin_from_cell_idx(self.idx, self.level, self.grid.dim)
         maxs = mins + 1
         return _get_hypercube_corners(mins, maxs)
     
     def _get_child_ids(self):
-        ndim = self.grid.ndim
+        ndim = self.grid.dim
         idx = self.idx
         return np.arange(idx * 2**ndim, (idx + 1) * 2**ndim)
     
     def _get_descendant_midpoint(self, idx, level):
         cur_level = level
         cur_idx = idx
-        ndim = self.grid.ndim
+        ndim = self.grid.dim
         origin = np.zeros(ndim)
         while cur_level > self.level:
             orthant = np.unravel_index(cur_idx % 2**ndim, [2] * ndim)
@@ -463,6 +454,74 @@ class _TreeCell:
 
 
 class _GridCache:
+    """Manager and cache for grid-based evaluations of a given PDF function.
+
+    Parameters
+    ----------
+    mins : 1D array-like
+        For k-dimensional structure, length-k array giving coordinate minima
+        along all axes (e.g., bottom-left corner in 2D).
+    maxs : 1D array-like
+        For k-dimensional structure, length-k array giving coordinate maxima
+        along all axes (e.g., top-right corner in 2D).
+    pdf : function
+        Probability density function to evaluate on grid. Function should
+        take coordinate vector (or batch of vectors if vectorized; see
+        `vectorizedpdf` parameter) and return (unnormalised) density (or
+        batch of densities). Additional arguments can be passed to the
+        function via `pdf_args` and `pdf_kwargs` parameters.
+    vectorizedpdf : bool, optional
+        if True, assumes that the pdf function is vectorized, i.e., it
+        accepts  (..., k)-shaped batches of coordinate vectors and returns
+        (...)-shaped batches of densities. If False, assumes that the pdf
+        function simply accepts (k,)-shaped coordinate vectors and returns
+        single densities. Default is False.
+    pdf_args : tuple, optional
+        Additional positional arguments to pass to pdf function; function
+        call is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty
+        tuple (no additional positional arguments).
+    pdf_kwargs : dict, optional
+        Additional keyword arguments to pass to pdf function; function call
+        is `pdf(position, *pdf_args, **pdf_kwargs)`. Default is empty dict
+        (no additional keyword arguments).
+
+    Attributes
+    ----------
+    mins : ndarray
+        See corresponding parameter in constructor.
+    maxs : ndarray
+        See corresponding parameter in constructor.
+    pdf : callable
+        See corresponding parameter in constructor.
+    vectorizedpdf : bool
+        See corresponding parameter in constructor.
+    pdf_args : tuple
+        See corresponding parameter in constructor.
+    pdf_kwargs : dict
+        See corresponding parameter in constructor.
+    dim : int
+        Dimensionality of the grid.
+    
+    Notes
+    -----
+    _GridCache actually stores a series of caches in the private attribute
+    _levelcaches. This is a dict with integer keys, corresponding to tree levels
+    (i.e., grid refinement levels). So, _levelcaches[0] is the cache for the
+    single-cell root grid, _levelcaches[1] is the cache for the 2^k-cell first
+    level, etc.
+    
+    Each of these caches is itself a dict, with tuple keys and float values.
+    The keys give the grid coordinates of the corners on the given level, and
+    the values are the cached PDF evaluations at the given corners. The grid
+    coordinates are integer grid indices, so in 2D the root level will have
+    corners (0, 0), (0, 1), (1, 0) and (1, 1), while the first level will
+    have (0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1) and 
+    (2, 2). However, several of these latter corners will appear in the
+    root level, namely (0, 0), (0, 2), (2, 0), and (2, 2), and so won't be
+    repeated in the level-1 cache. In general, at any level other than root,
+    if a coordinate tuple is all even-valued (including zero), then one must
+    instead consider the previous level.
+    """
     def __init__(self, mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs):
         # save arguments as attrs
         self.mins = np.array(mins)
@@ -473,14 +532,11 @@ class _GridCache:
         self.pdf_kwargs = pdf_kwargs
         
         # infer dimensionality
-        self.ndim = len(mins)
+        self.dim = len(mins)
         
-        # set up (currently empty) caches to save density evaluations
-        self.caches = {}
-        
-        # number of calls to density function: are we using this somewhere?
-        self.fn_calls = 0
-        return
+        # set up (currently empty) dict to store density caches
+        # see Notes in class docstring for how levelcaches work
+        self._levelcaches = {}
 
     def eval_positions(self, pos):
         
@@ -501,49 +557,77 @@ class _GridCache:
             
             # if any corners not in cache, evaluate density fn and cache
             if not m_cached.all():
-                pos = self._convert_corners_to_pos(corners[~m_cached], level)
+                pos = self.convert_corners_to_pos(corners[~m_cached], level)
                 
 
                 if self.vectorizedpdf:
                     densities[~m_cached] = self.pdf(pos,*self.pdf_args,**self.pdf_kwargs)
-                    self.fn_calls += pos.size
 
                 else:
                     new_densities = []
                     for xi in pos:
                         new_densities.append(self.pdf(xi,*self.pdf_args,**self.pdf_kwargs))
-                        self.fn_calls += 1
                     densities[~m_cached] = np.array(new_densities)
 
                 for i, corner in enumerate(corners[~m_cached]):
                     self._cache(corner, level, densities[~m_cached][i])
 
         else:
-            densities = self.pdf(self._convert_corners_to_pos(corners, level),*self.pdf_args,**self.pdf_kwargs)
+            densities = self.pdf(self.convert_corners_to_pos(corners, level),*self.pdf_args,**self.pdf_kwargs)
+            #densities = self.pdf(self.x,*self.pdf_args,**self.pdf_kwargs)
 
         return densities
 
-    def get_origin_from_cell_idx(self, idx, level):
-        assert idx in range(2**(level * self.ndim))
-        if level == 0:
-            return np.zeros(self.ndim, dtype=np.int64)
-        else:
-            parent_idx = idx // 2**self.ndim
-            orthant = np.unravel_index(idx % 2**self.ndim, [2] * self.ndim)
-            return 2 * self.get_origin_from_cell_idx(parent_idx, level-1) + orthant
+    def convert_corners_to_pos(self, corners, level):
+        """Convert grid corners to physical positions based on the grid level.
 
-    def _convert_corners_to_pos(self, corners, level):
+        Parameters
+        ----------
+        corners : array-like
+            2D array of ints, shape (N, k), where N is the number of points to
+            convert and k is the dimensionality of the grid. Each row of
+            corners gives the coordinates of the given point in the grid
+            coordinate system, i.e. the integers spanning 0 to 2^level.
+        level : int
+            The grid refinement level at which the corners are to be evaluated.
+
+        Returns
+        -------
+        positions : ``numpy`` array
+            2D array of floats, same shape as input corners, giving the physical
+            positions corresponding to the given grid corners.
+        """
         dx = (self.maxs - self.mins) / 2**level
         return self.mins + corners * dx
     
     def _retrieve_from_cache(self, corner, level):
+        """
+        Retrieve a cached value for a grid corner at a given grid level.
+
+        Parameters
+        ----------
+        corner : iterable
+            Sequence of ints giving the grid coordinates at which to retrieve
+            an evaluation from the cache.
+        level : int
+            The level of refinement of the grid.
+
+        Returns
+        -------
+        value : float or None
+            The cached density value or None if not found.
+        """
+        # convert to tuple
         corner = tuple(corner)
+        
+        # if corner is all even (and not at root level), search parent level
+        # else search this level
         if level != 0 and all(x % 2 == 0 for x in corner):
             return self._retrieve_from_cache(tuple(i // 2 for i in corner), level-1)
         else:
-            if level in self.caches:
+            if level in self._levelcaches:
                 try:
-                    val = self.caches[level][corner]
+                    val = self._levelcaches[level][corner]
                     return val
                 except KeyError:
                     return None
@@ -551,12 +635,30 @@ class _GridCache:
                 return None
     
     def _cache(self, corner, level, value):
+        """Caches a PDF evaluation for a given corner at a given level.
+
+        Parameters
+        ----------
+        corner : iterable
+            Sequence of ints giving the grid coordinates of the corner at which
+            to cache the PDF evaluation.
+        level : int
+            The level of refinement of the grid.
+        value : float
+            The density value to cache.
+
+        Returns
+        -------
+        None
+        """
+        # cast to tuple
         corner = tuple(corner)
+
+        # if corner is all even (and not at root), cache on parent level
+        # else cache on this level
         if level != 0 and all(x % 2 == 0 for x in corner):
             self._cache(tuple(i // 2 for i in corner), level-1, value)
         else:
-            if level not in self.caches:
-                self.caches[level] = {}
-            self.caches[level][corner] = value
-        return
-
+            if level not in self._levelcaches:
+                self._levelcaches[level] = {}
+            self._levelcaches[level][corner] = value
