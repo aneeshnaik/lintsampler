@@ -68,7 +68,7 @@ class DensityTree(DensityStructure):
     def __init__(
         self, mins, maxs, pdf,
         vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
-        min_openings=0
+        min_openings=0, usecache=True, batch=False
     ):
         # check mins/maxs shapes make sense
         if mins.ndim != 1:
@@ -88,19 +88,21 @@ class DensityTree(DensityStructure):
         self._mins = np.array(mins)
         self._maxs = np.array(maxs)
         self._dim = len(mins)
+        self._usecache = usecache
+        self.batch = batch
 
         # construct density cache
         self._cache = _GridCache(mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs)
 
         # set root cell
-        self.root = _TreeCell(parent=None, idx=0, level=0, grid=self._cache)
+        self.root = _TreeCell(parent=None, idx=0, level=0, grid=self._cache, usecache=self._usecache)
         
         # full openings
         leaves = [self.root]
         for _ in range(min_openings):
             new_leaves = []
             for leaf in leaves:
-                leaf.create_children()
+                leaf.create_children(batch=self.batch)
                 new_leaves += list(leaf.children)
             leaves = new_leaves        
         self.leaves = leaves
@@ -214,7 +216,7 @@ class DensityTree(DensityStructure):
         
         # LEAF LOOP:
         # repeatedly loop over leaves until each leaf has converged Romberg mass
-        leaves_converged = False
+        leaves_converged = True
         counter = 0
         while not leaves_converged:
             counter += 1
@@ -224,7 +226,7 @@ class DensityTree(DensityStructure):
                 err = np.abs(np.diff(leaf.romberg_estimates)[-1])
                 if err > leaf_tol * leaf.mass_romberg:
                     leaves_converged = False
-                    leaf.create_children()
+                    leaf.create_children(self.batch)
                     new_leaves += list(leaf.children)
                 else:
                     new_leaves.append(leaf)
@@ -251,7 +253,7 @@ class DensityTree(DensityStructure):
             # open most erroneous leaf
             ind = np.argmax(errs_sq)
             leaf = self.leaves.pop(ind)
-            leaf.create_children()
+            leaf.create_children(self.batch)
             self.leaves += list(leaf.children)
             if verbose:
                 print(
@@ -311,7 +313,7 @@ class DensityTree(DensityStructure):
 
 class _TreeCell:
     
-    def __init__(self, parent, idx, level, grid):
+    def __init__(self, parent, idx, level, grid, hold_eval=False, usecache=True):
         
         # check cell_idx in appropriate range for level
         assert idx in range(2**(level * grid.ndim))
@@ -321,14 +323,43 @@ class _TreeCell:
         self.idx = idx
         self.level = level
         self.grid = grid
+        self.usecache = usecache
         
         # store *real* (not grid) origin and real span of cell, calculate volume
         self.x = grid._convert_corners_to_pos(self._get_origin(), self.level)
         self.dx = (grid.maxs - grid.mins) / 2**self.level
         self.vol = np.prod(self.dx)
         
+        if hold_eval:
+            # create a list of corners we need
+            self.positions = self.grid._convert_corners_to_pos(self._get_corners(), self.level)
+            return
+            
+        else:
+            self._evaluate_cell()
+            
+        # no children yet!
+        self.children = None
+        
+        return
+    
+
+    def distribute_evaluations(self, corner_densities):
+
+        self.corner_densities = corner_densities
+
+        # trapezoid mass = volume * average(density)
+        self.mass_raw = self.vol * np.average(self.corner_densities)
+        
+        # romberg estimates
+        self.romberg_estimates = self._generate_romberg_estimates()
+        self.mass_romberg = self.romberg_estimates[-1]
+        return
+
+    
+    def _evaluate_cell(self):
         # calculate corner densities
-        self.corner_densities = self.grid.eval(self._get_corners(), self.level)
+        self.corner_densities = self.grid.eval(self._get_corners(), self.level, self.usecache)
         
         # trapezoid mass = volume * average(density)
         self.mass_raw = self.vol * np.average(self.corner_densities)
@@ -336,15 +367,40 @@ class _TreeCell:
         # romberg estimates
         self.romberg_estimates = self._generate_romberg_estimates()
         self.mass_romberg = self.romberg_estimates[-1]
-        
-        # no children yet!
-        self.children = None
         return
     
-    def create_children(self):
+    def create_children(self, batch=False):
+
         children = []
-        for idx in self._get_child_ids():
-            children.append(_TreeCell(self, idx, self.level + 1, self.grid))
+
+        if batch:
+            # create structure for the verticies to be stored
+            _nverticies = 2**(self.grid.ndim)
+            allverticies = np.zeros([_nverticies**2,self.grid.ndim])
+
+            # create cells; get positions to batch evaluate
+            for cellnumber,idx in enumerate(self._get_child_ids()):
+
+                # create cells, but don't evaluate yet (usecache is untouched in this case)
+                childcell = _TreeCell(self, idx, self.level + 1, self.grid, hold_eval=True)
+                children.append(childcell)
+
+                # get the positions to evaluate for all children at once and store in array
+                allverticies[cellnumber*_nverticies:(cellnumber+1)*_nverticies,:] = childcell.positions
+
+            # batch evaluate the densities
+            densities = self.grid.eval_positions(allverticies)
+
+            # send evaluations back to children
+            for cellnumber in range(_nverticies):
+                children[cellnumber].distribute_evaluations(densities[cellnumber*_nverticies:(cellnumber+1)*_nverticies])
+                        
+        else:
+            # default behaviour: do all child evaluations while creating children.
+            for idx in self._get_child_ids():
+
+                children.append(_TreeCell(self, idx, self.level + 1, self.grid, usecache=self.usecache))
+        
         self.children = tuple(children)
         return
     
@@ -426,35 +482,45 @@ class _GridCache:
         self.fn_calls = 0
         return
 
-    def eval(self, corners, level):
+    def eval_positions(self, pos):
         
-        # check which corners already in cache
-        m_cached = np.zeros(len(corners), dtype=bool)
-        densities = np.zeros(len(corners), dtype=np.float64)
-        for i, corner in enumerate(corners):
-            f = self._retrieve_from_cache(corner, level)
-            if f:
-                m_cached[i] = True
-                densities[i] = f
+        return self.pdf(pos,*self.pdf_args,**self.pdf_kwargs)
+    
+
+    def eval(self, corners, level, usecache):
         
-        # if any corners not in cache, evaluate density fn and cache
-        if not m_cached.all():
-            pos = self._convert_corners_to_pos(corners[~m_cached], level)
+        if usecache:
+            # check which corners already in cache
+            m_cached = np.zeros(len(corners), dtype=bool)
+            densities = np.zeros(len(corners), dtype=np.float64)
+            for i, corner in enumerate(corners):
+                f = self._retrieve_from_cache(corner, level)
+                if f:
+                    m_cached[i] = True
+                    densities[i] = f
             
+            # if any corners not in cache, evaluate density fn and cache
+            if not m_cached.all():
+                pos = self._convert_corners_to_pos(corners[~m_cached], level)
+                
 
-            if self.vectorizedpdf:
-                densities[~m_cached] = self.pdf(pos,*self.pdf_args,**self.pdf_kwargs)
-                self.fn_calls += pos.size
+                if self.vectorizedpdf:
+                    densities[~m_cached] = self.pdf(pos,*self.pdf_args,**self.pdf_kwargs)
+                    self.fn_calls += pos.size
 
-            else:
-                new_densities = []
-                for xi in pos:
-                    new_densities.append(self.pdf(xi,*self.pdf_args,**self.pdf_kwargs))
-                    self.fn_calls += 1
-                densities[~m_cached] = np.array(new_densities)
+                else:
+                    new_densities = []
+                    for xi in pos:
+                        new_densities.append(self.pdf(xi,*self.pdf_args,**self.pdf_kwargs))
+                        self.fn_calls += 1
+                    densities[~m_cached] = np.array(new_densities)
 
-            for i, corner in enumerate(corners[~m_cached]):
-                self._cache(corner, level, densities[~m_cached][i])
+                for i, corner in enumerate(corners[~m_cached]):
+                    self._cache(corner, level, densities[~m_cached][i])
+
+        else:
+            densities = self.pdf(self._convert_corners_to_pos(corners, level),*self.pdf_args,**self.pdf_kwargs)
+
         return densities
 
     def get_origin_from_cell_idx(self, idx, level):
