@@ -356,13 +356,28 @@ class LintSampler:
         if isinstance(domain, DensityStructure):
             self.ngrids = 1
             self.grids = [domain]
-            #TODO: warn if PDF not none
+            if self.pdf:
+                warn(
+                        "LintSampler.__set_grids: " \
+                        "Pre-constructed DensityStructure provided, so `pdf` "\
+                        "parameter is redundant."
+                    )
         elif isinstance(domain, list) and _all_are_instances(domain, DensityStructure):
             self.ngrids = len(domain)
             self.grids = domain
-            #TODO: warn if PDF not none
+            if self.pdf:
+                warn(
+                        "LintSampler.__set_grids: " \
+                        "Pre-constructed DensityStructure provided, so `pdf` "\
+                        "parameter is redundant."
+                    )
         elif isinstance(domain, list) and not _is_1D_iterable(domain):
-            #TODO: raise error if PDF none
+            # check PDF provided
+            if not self.pdf:
+                raise ValueError(
+                    "LintSampler._set_grids: "\
+                    f"No PDF provided and no pre-constructed DensityStructure."
+                )
             # check all list items are same sort of thing
             if not _all_are_instances(domain, type(domain[0])):
                 raise TypeError(
@@ -376,7 +391,12 @@ class LintSampler:
             )
             self.grids = [DensityGrid(edges=ci, **gargs) for ci in domain]
         else:
-            #TODO: raise error if PDF none
+            # check PDF provided
+            if not self.pdf:
+                raise ValueError(
+                    "LintSampler._set_grids: "\
+                    f"No PDF provided and no pre-constructed DensityStructure."
+                )
             self.ngrids = 1
             self.grids = [
                 DensityGrid(edges=domain, pdf=self.pdf, vectorizedpdf=self.vectorizedpdf,
