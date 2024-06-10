@@ -39,7 +39,9 @@ Making a histogram of the resulting samples and comparing to the input density f
 installation
 usage
 lintsampler
+densitystructure
 densitygrid
+densitytree
 attribution
 license
 ```
@@ -53,7 +55,7 @@ example_notebooks/1_gmm
 example_notebooks/2_doughnuts
 example_notebooks/3_dark_matter
 example_notebooks/4_qmc
-examples/bonus_logo
+example_notebooks/bonus_logo
 ```
 
 ```{toctree}
