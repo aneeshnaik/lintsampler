@@ -6,31 +6,23 @@ from .density_structures.base import DensityStructure
 from .utils import _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
 from .sampling import _grid_sample
 
-# TODO: update docs to allow any DensityStructure
+
 class LintSampler:
     """Linear interpolant sampler for density function defined on grid(s).
 
-    ``LintSampler`` takes a primary argument, ``domain``, which is the region within
-    which sampling takes place. ``domain`` should contain one or k sequences of
-    numbers representing the `edges` of a one- or k-dimensional grid. The given
-    edges need not be evenly spaced, but should be monotonically increasing.
-    After construction, various grid-related attributes become available. ``domain``
-    may also be a pre-constructed ``DensityGrid`` object; see example below and the
-    ``DensityGrid`` documentation for more details.
-
-    After instantiation, the ``sample`` method may be called, which realises the 
-    random sampling of the ``pdf`` on the domain. ``pdf`` may be directly passed,
-    or it may be pre-evaluated in an input ``DensityGrid`` object. The sampling may
-    either take place at random (default), or in a low-discrepancy sequence (with 
-    `qmc=True`).
+    ``LintSampler`` takes a primary argument, ``domain``, which is the region
+    within which sampling takes place. After instantiation, the ``sample``
+    method realises the random sampling of the given ``pdf`` on the domain. The
+    sampling may either take place at random (default), or in a low-discrepancy
+    sequence (with `qmc=True`).
  
-    See the parameters below for additional control options, and further examples 
-    below for the various usage patterns.
+    See the parameters below for additional control options, and further
+    examples below for the various usage patterns.
 
     Parameters
     ----------
     
-    domain : iterable or ``DensityGrid``
+    domain : iterable or ``DensityStructure``
         Coordinate grid(s) to draw samples over. Several forms are available. If
         using a single coordinate grid, then ``domain`` can be any of:
         
@@ -41,9 +33,9 @@ class LintSampler:
           the grid has (N1, N2, ..., Nk) cells, then the tuple should have
           length k, and the 1D arrays in the tuple should have lengths 
           N1+1, N2+1, ..., Nk+1.
-        - a ``DensityGrid`` instance, either with densities pre-evaluated or
-          not. If densities are already evaluated, ``pdf`` parameter should not
-          be set and vice versa.
+        - a ``DensityStructure`` subclass instance. In this case, ``pdf``
+          parameter should not be set, as a PDF has already been evaluated over
+          the ``DensityStructure``.
         
         If using multiple (non-overlapping) coordinate grids, then ``domain``
         should be a list of any of the above. See the examples below for the
@@ -57,8 +49,7 @@ class LintSampler:
         function via ``pdf_args`` and ``pdf_kwargs`` parameters. Default is
         ``None``, in which case it is assumed that ``domain`` parameter 
         comprises one instance or a list of several instances of 
-        ``DensityGrid``, already having densities evaluated (i.e., the
-        ``DensityGrid`` attribute ``densities_evaluated`` is ``True``).
+        ``DensityStructure``.
     
     vectorizedpdf : bool, optional
         if ``True``, assumes that the pdf function is vectorized, i.e., it
@@ -120,12 +111,12 @@ class LintSampler:
         Dimensionality of PDF / coordinate space.
     
     grids : list
-        List of ``DensityGrid`` instances corresponding to series of coordinate
-        grids passed by the user in ``domain`` parameter. Single list element
-        if only one grid passed.
+        List of ``DensityStructure`` instances corresponding to series of
+        sampling domains passed in ``domain`` parameter. Single list element if
+        only one domain passed.
     
     ngrids : int
-        Number of coordinate grids to sample over (i.e., length of ``grids``
+        Number of domains to sample over (i.e., length of ``grids``
         attribute).
     
     qmc : bool
@@ -201,9 +192,8 @@ class LintSampler:
 
     >>> x = np.linspace(0, 10, 33)
     >>> y = np.linspace(100, 200, 65)
-    >>> g = DensityGrid((x, y))
     >>> def pdfrandom(X): return np.random.uniform()
-    >>> g.evaluate(pdfrandom)
+    >>> g = DensityGrid((x, y), pdfrandom)
     >>> LintSampler(g).sample()
     array([  1.417842  , 139.40070095])
 
