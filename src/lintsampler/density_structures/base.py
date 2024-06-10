@@ -70,7 +70,7 @@ class DensityStructure(ABC):
     @property
     @abstractmethod
     def total_mass(self):
-        """Total probabiliy mass of the structure.
+        """Total probability mass of the structure.
         
         Returns
         -------

@@ -16,3 +16,4 @@ myst_enable_extensions = [
 ]
 myst_heading_anchors = 2
 nb_execution_timeout = 120
+numpydoc_class_members_toctree = False

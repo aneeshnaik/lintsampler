@@ -22,6 +22,6 @@
          [  18.5522151 ,  133.87092063, 1558.85620176]])
   ```
 
-  See the {doc}`function docstring <LintSampler>` or the example notebooks for further details and examples.
+  See the [function docstring](./lintsampler) or the example notebooks for further details and examples.
 
 
