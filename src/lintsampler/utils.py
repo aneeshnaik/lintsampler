@@ -2,15 +2,42 @@ import numpy as np
 
 
 def _get_grid_origin_from_cell_idx(idx, level, dim):
-    #TODO docstring
-    #TODO promote assertion to Error
-    assert idx in range(2**(level * dim))
+    """Compute the origin of a grid cell in grid coordinates.
+
+    Parameters
+    ----------
+    idx : int
+        The index of the cell in the grid. Must be in the range
+        [0, 2**(level * dim)).
+    level : int
+        The level of the grid. Must be a non-negative integer.
+    dim : int
+        The dimension of the grid. Must be a positive integer.
+
+    Returns
+    -------
+    origin : numpy.ndarray
+        The integer grid coordinates of the origin of the specified cell in the
+        grid. The returned array has a shape of (dim,) and dtype of np.int64.
+    """
+    import numpy as np
+    
+    # check that given idx makes sense
+    if not (0 <= idx < 2**(level * dim)):
+        raise ValueError("`idx` must be in the range [0, 2**(level * dim))")
+    
+    # if at root level, give zeros, otherwise go up a level
     if level == 0:
         return np.zeros(dim, dtype=np.int64)
     else:
-        parent_idx = idx // 2**dim
+        # index of parent cell (by integer division)
+        pidx = idx // 2**dim
+        
+        # orthant of this cell within parent
         orthant = np.unravel_index(idx % 2**dim, [2] * dim)
-        return 2 * _get_grid_origin_from_cell_idx(parent_idx, level-1, dim) + orthant
+        
+        # recurse
+        return 2 * _get_grid_origin_from_cell_idx(pidx, level-1, dim) + orthant
 
 
 def _get_unit_hypercube_corners(ndim):
