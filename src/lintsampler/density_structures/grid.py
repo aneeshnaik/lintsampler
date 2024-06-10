@@ -4,8 +4,7 @@ from warnings import warn
 from ..utils import _is_1D_iterable, _choice
 from .base import DensityStructure
 
-#TODO separate inherited and specific attrs in docstring
-#TODO update examples to reflect densities evaluated on init
+
 class DensityGrid(DensityStructure):
     """Grid-like object over which density function is evaluated.
 
@@ -51,8 +50,17 @@ class DensityGrid(DensityStructure):
 
     Attributes
     ---------- 
+    mins : ``numpy`` array
+        1D array (length ``dim``), giving lower coordinate bound of grid
+        along each dimension. Enforced by base class ``DensityStructure``.
+    maxs : ``numpy`` array
+        1D array (length ``dim``), giving upper coordinate bound of grid
+        along each dimension. Enforced by base class ``DensityStructure``.
     dim : int
-        Dimensionality of grid.
+        Dimensionality of grid. Enforced by base class ``DensityStructure``.
+    total_mass : float
+        Total probability mass of this grid; summed over ``masses`` array.
+        Enforced by base class ``DensityStructure``.
     shape : tuple
         ``dim``-length tuple giving grid shape. For example, if 
         ``edgearrays`` have lengths N1+1, N2+1, ... Nk+1, then ``shape`` is
@@ -61,12 +69,6 @@ class DensityGrid(DensityStructure):
         Total number of cells in grid, i.e., the product over the shape tuple.
     edgearrays : list
         Length ``dim`` list of arrays of grid edges along each dimension.
-    mins : ``numpy`` array
-        1D array (length ``dim``), giving lower coordinate bound of grid
-        along each dimension.
-    maxs : ``numpy`` array
-        1D array (length ``dim``), giving upper coordinate bound of grid
-        along each dimension.
     vertex_densities : ``numpy`` array
         k-dimensional array giving densities at vertices of grid. Shape is
         (N1+1, N2+1, ...) if grid has (N1, N2, ...) cells along each dimension.
@@ -75,8 +77,6 @@ class DensityGrid(DensityStructure):
         to grid shape (``shape`` attribute). Masses are calculated according to
         trapezoid rule, i.e., cell volumes multiplied by average vertex
         densities.
-    total_mass : float
-        Total probability mass of this grid; summed over ``masses`` array.
 
     Examples
     --------
@@ -85,19 +85,24 @@ class DensityGrid(DensityStructure):
     of ``DensityGrid``.
 
     - A one-dimensional grid, spanning x=0 to x=10 with 32 cells (so 33 edges).
-    
-      >>> g = DensityGrid(np.linspace(0, 30, 33))
+      As an example PDF we can take an unnormalised Gaussian:
+
+      >>> pdf = lambda x: np.exp(-x**2)
+      >>> g = DensityGrid(np.linspace(0, 30, 33), pdf)
     
       At this point, the object ``g`` has various attributes set up describing
       the grid and its geometry. We'll save a demonstration of these for the
       next example, where they will be more interesting.
 
     - A two-dimensional grid, with 32 x 64 cells (so 33 gridlines along one
-      axis and 65 along the other).
+      axis and 65 along the other). For the PDF function, rather than writing
+      our own we'll use the bivariate standard normal PDF from
+      ``scipy.stats.multivariate_normal``:
     
-      >>> x = np.linspace(0, 10, 33)
-      >>> y = np.linspace(100, 200, 65)
-      >>> g = DensityGrid((x, y))
+      >>> pdf = multivariate_normal(mean=np.zeros(2), cov=np.eye(2)).pdf
+      >>> x = np.linspace(-2, 2, 33)
+      >>> y = np.linspace(-4, 4, 65)
+      >>> g = DensityGrid((x, y), pdf)
 
       Let's explore some of the attributes of ``g``. First, some basic
       descriptors of the grid geometry:
@@ -127,86 +132,80 @@ class DensityGrid(DensityStructure):
       >>> all(g.edgearrays[1] == y)
       True
       
-      Finally, the flag ``densities_evaluated`` tells us that we have not yet
-      called the ``evaluate`` method to get the grid vertex densities:
+      There are also various attributes which relate to the evaluated
+      probability densities and masses:
       
-      >>> g.densities_evaluated
-      False
+      >>> g.vertex_densities
+      array([[7.22562324e-06, 1.18203307e-05, 1.90369817e-05, ...,
+              1.90369817e-05, 1.18203307e-05, 7.22562324e-06],
+             [9.20568282e-06, 1.50594920e-05, 2.42537439e-05, ...,
+              2.42537439e-05, 1.50594920e-05, 9.20568282e-06],
+             [1.15465131e-05, 1.88888347e-05, 3.04210101e-05, ...,
+              3.04210101e-05, 1.88888347e-05, 1.15465131e-05],
+             ...,
+             [1.15465131e-05, 1.88888347e-05, 3.04210101e-05, ...,
+              3.04210101e-05, 1.88888347e-05, 1.15465131e-05],
+             [9.20568282e-06, 1.50594920e-05, 2.42537439e-05, ...,
+              2.42537439e-05, 1.50594920e-05, 9.20568282e-06],
+             [7.22562324e-06, 1.18203307e-05, 1.90369817e-05, ...,
+              1.90369817e-05, 1.18203307e-05, 7.22562324e-06]])
+      >>> g.masses
+      array([[1.69184097e-07, 2.74103704e-07, 4.37229522e-07, ...,
+              4.37229522e-07, 2.74103704e-07, 1.69184097e-07],
+             [2.13673916e-07, 3.46183909e-07, 5.52206419e-07, ...,
+              5.52206419e-07, 3.46183909e-07, 2.13673916e-07],
+             [2.65695257e-07, 4.30466311e-07, 6.86647340e-07, ...,
+              6.86647340e-07, 4.30466311e-07, 2.65695257e-07],
+              ...,
+             [2.65695257e-07, 4.30466311e-07, 6.86647340e-07, ...,
+              6.86647340e-07, 4.30466311e-07, 2.65695257e-07],
+             [2.13673916e-07, 3.46183909e-07, 5.52206419e-07, ...,
+              5.52206419e-07, 3.46183909e-07, 2.13673916e-07],
+             [1.69184097e-07, 2.74103704e-07, 4.37229522e-07, ...,
+              4.37229522e-07, 2.74103704e-07, 1.69184097e-07]])
+      >>> g.total_mass
+      0.9541568382986452
+      
+      ``vertex_densities`` is a 2D (33 x 65) array containing the densities on
+      all of the grid vertices, while ``masses`` is a 2D (32 x 64) array giving
+      the probability masses of grid cells, and ``total_mass`` gives the total
+      probability mass across the grid.
+
+    - Things are slightly more efficient when the PDF function is vectorized,
+      i.e., the PDF function takes a batch of input positions and returns a
+      corresponding batch of densities. As it happens, the PDF function we used
+      above is already nicely vectorized, so we can let DensityGrid know about
+      this with a simple Boolean flag:
+      
+      >>> pdf = multivariate_normal(mean=np.zeros(2), cov=np.eye(2)).pdf
+      >>> x = np.linspace(0, 10, 33)
+      >>> y = np.linspace(100, 200, 65)
+      >>> g = DensityGrid((x, y), pdf, vectorizedpdf=True)
 
     - It is also possible to construct a grid with just a single cell.
     
       In one dimension:
     
-      >>> g = DensityGrid([0, 10])
+      >>> pdf = lambda x: np.exp(-x**2)
+      >>> g = DensityGrid([-5, 5], pdf)
       >>> g.ncells
       1
        
       In multiple dimensions:
-       
-      >>>  g = DensityGrid(([0, 10], [100, 200]))
-      >>> g.ncells
-      1
-
-    - Now, a demonstration of using ``evaluate`` to evaluate a given 1D PDF
-      function.
-    
-      As an example in 1D we can take an unnormalised Gaussian:
-
-      >>> pdf = lambda x: np.exp(-x**2)      
-      >>> g = DensityGrid(np.linspace(-3, 3, 7))
-      >>> g.evaluate(pdf)
-      
-      Having called ``evaluate``, the ``densities_evaluated`` flag is now
-      ``True`` and various other attributes are now meaningful:
-      
-      >>> g.densities_evaluated
-      True
-      >>> g.vertex_densities
-      array([1.23409804e-04, 1.83156389e-02, 3.67879441e-01, 1.00000000e+00,
-             3.67879441e-01, 1.83156389e-02, 1.23409804e-04])
-      >>> g.masses
-      array([0.00921952, 0.19309754, 0.68393972, 0.68393972, 0.19309754,
-             0.00921952])
-      >>> g.total_mass
-      1.7725135699244396
-      
-      ``vertex_densities`` contains the densities on the 7 grid vertices, while
-      ``masses`` contains the masses of the 6 cells, and ``total_mass`` gives
-      the total probability mass across the grid.
-      
-      Things are slightly more efficient when the PDF function is vectorized,
-      i.e., the PDF function takes a batch of input positions and returns a
-      corresponding batch of densities. As it happens, the PDF function written
-      above is already nicely vectorized, so we can let ``evaluate`` know with
-      a flag. We can use the same grid object as above, taking care to first
-      reset the densities.
-      
-      >>> g.reset_densities()
-      >>> g.evaluate(pdf, vectorizedpdf=True)
-    
-    - Another example of ``evaluate``, now with a bivariate PDF.
-      
-      For the PDF function, rather than writing our own we'll use the bivariate
-      standard normal PDF from ``scipy.stats.multivariate_normal``:
     
       >>> pdf = multivariate_normal(mean=np.zeros(2), cov=np.eye(2)).pdf
-      >>> g = DensityGrid((np.linspace(-3, 3, 129), np.linspace(-3, 3, 129)))
-      >>> g.evaluate(pdf, vectorizedpdf=True)
-      >>> g.total_mass
-      0.9945979872720603
+      >>> g = DensityGrid(([0, 10], [100, 200]), pdf)
+      >>> g.ncells
+      1
       
     - Example usage of ``choose_cells`` method
       
-      Once the ``evaluate`` method has been called (so that the attribute 
-      ``densities_evaluated`` is ``True``), the ``choose_cells`` method can be
-      used to randomly select grid cells (weighted by their masses), given a 1D
-      array of uniform samples.
-      
-      Taking the same 2D grid and PDF as in the previous example:
-      
+      The ``choose_cells`` method can be used to randomly select grid cells
+      (weighted by their masses), given a 1D array of uniform samples.
+
       >>> pdf = multivariate_normal(mean=np.zeros(2), cov=np.eye(2)).pdf
-      >>> g = DensityGrid((np.linspace(-3, 3, 129), np.linspace(-3, 3, 129)))
-      >>> g.evaluate(pdf, vectorizedpdf=True)
+      >>> x = y = np.linspace(-3, 3, 129)
+      >>> g = DensityGrid((x, y), pdf, vectorizedpdf=True)
       >>> u = np.random.default_rng().uniform(size=10)  
       >>> mins, maxs, corners = g.choose_cells(u)
       
