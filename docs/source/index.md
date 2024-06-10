@@ -49,9 +49,10 @@ license
 :hidden: true
 :maxdepth: 1
 
-examples/1_gmm
-examples/2_doughnuts
-examples/3_dark_matter
+example_notebooks/1_gmm
+example_notebooks/2_doughnuts
+example_notebooks/3_dark_matter
+example_notebooks/4_qmc
 examples/bonus_logo
 ```
 

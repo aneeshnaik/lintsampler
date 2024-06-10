@@ -15,3 +15,4 @@ myst_enable_extensions = [
     "dollarmath",
 ]
 myst_heading_anchors = 2
+nb_execution_timeout = 120
