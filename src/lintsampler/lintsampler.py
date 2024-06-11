@@ -365,6 +365,12 @@ class LintSampler:
         elif isinstance(domain, list) and _all_are_instances(domain, DensityStructure):
             self.ngrids = len(domain)
             self.grids = domain
+            # check all list items are same sort of thing
+            if not _all_are_instances(domain, type(domain[0])):
+                raise TypeError(
+                    "LintSampler._set_grids: "\
+                    f"List members of different types"
+                )
             if self.pdf:
                 warn(
                         "LintSampler.__set_grids: " \

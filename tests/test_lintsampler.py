@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from scipy.stats import norm, multivariate_normal
 from scipy.stats.qmc import Sobol, Halton
-from lintsampler import LintSampler, DensityGrid
+from lintsampler import LintSampler, DensityGrid, DensityTree
 
 X_EDGES = np.linspace(-10, 10, 65)
 Y_EDGES = np.linspace(-5, 5, 33)
@@ -27,7 +27,9 @@ CELLS_2D = [
     [(list(X0_EDGES), list(Y0_EDGES)), (list(X0_EDGES), list(Y1_EDGES)), (list(X1_EDGES), list(Y0_EDGES)), (list(X1_EDGES), list(Y1_EDGES))],
 ]
 GRID_1D = DensityGrid(X_EDGES, pdf=norm.pdf, vectorizedpdf=True)
+#TREE_1D = DensityTree(np.array([-10]), np.array([10]), pdf=norm.pdf, vectorizedpdf=True)
 GRID_2D = DensityGrid((X_EDGES, Y_EDGES), pdf=multivariate_normal(np.zeros(2), np.eye(2)).pdf, vectorizedpdf=True)
+TREE_2D = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=multivariate_normal(np.zeros(2), np.eye(2)).pdf, vectorizedpdf=True)
 B0 = np.array([1.0, 1.5, 1.5, 2.0])
 B1 = np.ones(10)
 B2 = np.array([9.0, 8.0, 10.0, 12.0])
@@ -233,10 +235,10 @@ def test_kD_edges_overlapping(cells):
     with pytest.raises(ValueError):
         LintSampler(domain=cells, pdf=dist.pdf)
 
-
 @pytest.mark.parametrize("cells", [
     [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]))],
     [GRID_1D, GRID_2D],
+#TODO    [TREE_1D, TREE_2D],
 ])
 def test_kD_mismatched_dims(cells):
     """Test error raised if distinct kD grids have mismatched dimensions"""
@@ -244,11 +246,13 @@ def test_kD_mismatched_dims(cells):
     with pytest.raises(ValueError):
         LintSampler(domain=cells, pdf=dist.pdf)
 
-
-def test_kD_mismatched_types():
+@pytest.mark.parametrize("cells", [
+    [(X0_EDGES, Y0_EDGES), GRID_2D],
+    [GRID_2D, TREE_2D],
+])
+def test_kD_mismatched_types(cells):
     """Test error raised if distinct kD grids have mismatched types"""
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    cells = [(X0_EDGES, Y0_EDGES), GRID_2D]
     with pytest.raises(TypeError):
         LintSampler(domain=cells, pdf=dist.pdf)
 
@@ -350,6 +354,37 @@ def test_1D_output_shapes_preconstructed_grids(N_samples, vectorizedpdf, qmc):
         assert x.shape == (N_samples,)
 
 
+@pytest.mark.parametrize("N_samples", [None, 16])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("qmc", [True, False])
+def test_1D_output_shapes_preconstructed_tree(N_samples, vectorizedpdf, qmc):
+    """Single sample in 1D -> float, multiple samples -> 1D array"""
+    tree = DensityTree(mins=-10, maxs=10, pdf=norm.pdf, vectorizedpdf=vectorizedpdf)
+    sampler = LintSampler(domain=tree, qmc=qmc, seed=42)
+    x = sampler.sample(N=N_samples)
+    if N_samples is None:
+        assert isinstance(x, float)
+    else:
+        assert x.shape == (N_samples,)
+
+
+@pytest.mark.parametrize("N_samples", [None, 16])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("qmc", [True, False])
+def test_1D_output_shapes_preconstructed_trees(N_samples, vectorizedpdf, qmc):
+    """Single sample in 1D -> float, multiple samples -> 1D array"""
+    trees = [
+        DensityTree(mins=-10, maxs=0, pdf=norm.pdf, vectorizedpdf=vectorizedpdf),
+        DensityTree(mins=0, maxs=10, pdf=norm.pdf, vectorizedpdf=vectorizedpdf)
+    ]
+    sampler = LintSampler(domain=trees, qmc=qmc, seed=42)
+    x = sampler.sample(N=N_samples)
+    if N_samples is None:
+        assert isinstance(x, float)
+    else:
+        assert x.shape == (N_samples,)
+
+
 @pytest.mark.parametrize("cells", CELLS_2D)
 @pytest.mark.parametrize("N_samples", [None, 16])
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
@@ -391,6 +426,41 @@ def test_kD_output_shapes_preconstructed_grids(N_samples, vectorizedpdf, qmc):
         DensityGrid((X0_EDGES, Y1_EDGES), pdf=dist.pdf, vectorizedpdf=vectorizedpdf),
         DensityGrid((X1_EDGES, Y0_EDGES), pdf=dist.pdf, vectorizedpdf=vectorizedpdf),
         DensityGrid((X1_EDGES, Y1_EDGES), pdf=dist.pdf, vectorizedpdf=vectorizedpdf)
+    ]
+    sampler = LintSampler(domain=grids, qmc=qmc, seed=42)
+    x = sampler.sample(N=N_samples)
+    if N_samples is None:
+        assert x.shape == (2,)
+    else:
+        assert x.shape == (N_samples, 2)
+
+
+@pytest.mark.parametrize("N_samples", [None, 16])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("qmc", [True, False])
+def test_kD_output_shapes_preconstructed_tree(N_samples, vectorizedpdf, qmc):
+    """Single sample in kD -> k-vector, multiple samples -> 2D array (N, k)"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    tree = DensityTree(mins=np.array([-10, -5]), maxs=np.array([10, 5]), pdf=dist.pdf, vectorizedpdf=vectorizedpdf)
+    sampler = LintSampler(domain=tree, qmc=qmc, seed=42)
+    x = sampler.sample(N=N_samples)
+    if N_samples is None:
+        assert x.shape == (2,)
+    else:
+        assert x.shape == (N_samples, 2)
+
+
+@pytest.mark.parametrize("N_samples", [None, 16])
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("qmc", [True, False])
+def test_kD_output_shapes_preconstructed_trees(N_samples, vectorizedpdf, qmc):
+    """Single sample in kD -> k-vector, multiple samples -> 2D array (N, k)"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    grids = [
+        DensityTree(np.array([-10, -5]), np.array([0, 0]), pdf=dist.pdf, vectorizedpdf=vectorizedpdf),
+        DensityTree(np.array([-10, 0]), np.array([0, 5]), pdf=dist.pdf, vectorizedpdf=vectorizedpdf),
+        DensityTree(np.array([0, -5]), np.array([5, 0]), pdf=dist.pdf, vectorizedpdf=vectorizedpdf),
+        DensityTree(np.array([0, 0]), np.array([5, 5]), pdf=dist.pdf, vectorizedpdf=vectorizedpdf)
     ]
     sampler = LintSampler(domain=grids, qmc=qmc, seed=42)
     x = sampler.sample(N=N_samples)
@@ -467,8 +537,26 @@ def test_1D_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     assert (mu, sig) == (mu_true, sig_true)
 
 
-def test_1D_gaussian_preevaluated():
-    """Test samples from a 1D gaussian have correct mean and variance with preevaluated grid"""
+@pytest.mark.parametrize("min_openings,refine,tree_tol", [(4, False, None), (2, True, 1e-3)])
+def test_1D_gaussian_tree(min_openings, refine, tree_tol):
+    """Test samples from a 1D gaussian have correct mean and variance with preconstructed DensityTree"""
+    mu_true = -2.0
+    sig_true = 1.8
+    d = norm(loc=mu_true, scale=sig_true)
+
+    tree = DensityTree(mins=np.array([-10]), maxs=np.array([10]), pdf=d.pdf, vectorizedpdf=True, min_openings=min_openings)
+    if refine:
+        tree.refine_by_error(tree_tol=tree_tol)
+
+    sampler = LintSampler(domain=tree)
+    x = sampler.sample(N=2**17)
+    mu = np.round(np.mean(x), decimals=0)
+    sig = np.round(np.std(x), decimals=1)
+    assert (mu, sig) == (mu_true, sig_true)
+
+
+def test_1D_gaussian_grid():
+    """Test samples from a 1D gaussian have correct mean and variance with preconstructed DensityGrid"""
     mu_true = -2.0
     sig_true = 1.8
     d = norm(loc=mu_true, scale=sig_true)
@@ -499,8 +587,33 @@ def test_kD_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     cov = np.round(np.cov(x.T), decimals=1)
     assert np.all(mu == mu_true) and np.all(cov == cov_true)
 
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+@pytest.mark.parametrize("min_openings,refine,tree_tol", [(6, False, None), (3, True, 1e-4)])
+def test_kD_gaussian_tree(vectorizedpdf, min_openings, refine, tree_tol):
 
-def test_kD_gaussian_preevaluated():
+    mu_true = np.array([1.5, -0.5])
+    cov_true = np.array([
+        [ 1.0,  -0.5],
+        [-0.5,  1.5],
+    ])
+    dist = multivariate_normal(mean=mu_true, cov=cov_true)
+
+    tree = DensityTree(
+        mins=np.array([-10, -5]), maxs=np.array([10, 5]),
+        pdf=dist.pdf, vectorizedpdf=vectorizedpdf,
+        min_openings=min_openings
+    )
+    if refine:
+        tree.refine_by_error(tree_tol=tree_tol, leaf_tol=None, verbose=True)
+    sampler = LintSampler(domain=tree)
+    x = sampler.sample(N=2**18)
+
+    mu = np.round(np.mean(x, axis=0), decimals=1)
+    cov = np.round(np.cov(x.T), decimals=1)
+    assert np.all(mu == mu_true) and np.all(cov == cov_true)
+
+
+def test_kD_gaussian_grid():
     """Test samples from single kD Gaussian have correct mean and cov when densities provided on pre-evaluated grid."""
     mu_true = np.array([1.5, -0.5])
     cov_true = np.array([
