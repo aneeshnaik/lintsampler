@@ -506,7 +506,12 @@ class _TreeCell:
             # Subtract the refined differences in place
             raws[:-1] = raws[:-1] - np.diff(raws) / divisor
             # Append the first refined estimate to the estimates list
-            estimates.append(raws[0])
+
+            # A guard for particularly bad estimates
+            if raws[0] < 0:
+                estimates.append(0.0)
+            else:
+                estimates.append(raws[0])
         
         # Return the list of refined estimates
         return estimates

@@ -20,7 +20,6 @@ def _get_grid_origin_from_cell_idx(idx, level, dim):
         The integer grid coordinates of the origin of the specified cell in the
         grid. The returned array has a shape of (dim,) and dtype of np.int64.
     """
-    import numpy as np
     
     # check that given idx makes sense
     if not (0 <= idx < 2**(level * dim)):
