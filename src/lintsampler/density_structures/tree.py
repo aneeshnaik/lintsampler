@@ -235,28 +235,46 @@ class DensityTree(DensityStructure):
         # repeatedly open most erroneous leaf in tree until whole tree converged
         tree_converged = False
         counter = 0
+
+        # Precompute initial values
+        masses_romberg = np.array([leaf.mass_romberg for leaf in self.leaves])
+        masses_raw = np.array([leaf.mass_raw for leaf in self.leaves])
+
         while not tree_converged:
             counter += 1
 
             # total romberg mass
-            m_tot = np.sum([leaf.mass_romberg for leaf in self.leaves])
-            
-            # leaf errors            
-            errs_sq = np.array([(leaf.mass_romberg - leaf.mass_raw)**2 for leaf in self.leaves])
+            m_tot = np.sum(masses_romberg)
+
+            # leaf errors
+            errs_sq = (masses_romberg - masses_raw) ** 2
             err_tot = np.sqrt(np.sum(errs_sq))
             if err_tot / m_tot < tree_tol:
                 tree_converged = True
-            
+                break
+
             # open most erroneous leaf
             ind = np.argmax(errs_sq)
             leaf = self.leaves.pop(ind)
             leaf.create_children(self.batch)
+
+            # Update masses_romberg and masses_raw lists
+            masses_romberg = np.delete(masses_romberg, ind)
+            masses_raw = np.delete(masses_raw, ind)
+
+            children_masses_romberg = np.array([child.mass_romberg for child in leaf.children])
+            children_masses_raw = np.array([child.mass_raw for child in leaf.children])
+
+            masses_romberg = np.concatenate((masses_romberg, children_masses_romberg))
+            masses_raw = np.concatenate((masses_raw, children_masses_raw))
+
             self.leaves += list(leaf.children)
+
             if verbose:
                 print(
-                    f"End of tree iteration {counter}: "\
-                    f"{len(self.leaves)} leaves on tree. "\
-                    f"Total mass={self.total_mass}. "\
+                    f"End of tree iteration {counter}: "
+                    f"{len(self.leaves)} leaves on tree. "
+                    f"Total mass={m_tot}. "
                     f"Fractional error={err_tot / m_tot}."
                 )
 
@@ -310,8 +328,9 @@ class _TreeCell:
     
     def __init__(self, parent, idx, level, grid, hold_eval=False, usecache=True):
         
-        # check cell_idx in appropriate range for level
-        assert idx in range(2**(level * grid.dim))
+        # Check cell_idx in appropriate range for level
+        if not (0 <= idx < 2**(level * grid.dim)):
+            raise ValueError(f"lintsampler.tree._TreeCell: Index {idx} is out of range for level {level} with grid dimension {grid.dim}.")
         
         # save arguments as attrs
         self.parent = parent
@@ -437,19 +456,34 @@ class _TreeCell:
         return midpt
     
     def _generate_romberg_estimates(self):
-        raws = [self.mass_raw]
-        ancestor = self
-        for i in range(self.level):
-            ancestor = ancestor.parent
-            raws.append(ancestor.estimate_descendant_mass(self.idx, self.level))
-        raws = np.array(raws)
 
+        # Store frequently accessed attributes in local variables
+        level = self.level
+        idx = self.idx
+
+        # Collect raw estimates from the current object and its ancestors
+        ancestor = self
+        raws = [ancestor.mass_raw] + [
+            (ancestor := ancestor.parent).estimate_descendant_mass(idx, level)
+            for _ in range(level)
+        ]
+        raws = np.array(raws)
+        
+        # Initialize estimates with the first raw estimate
         estimates = [raws[0]]
-        level_estimates = np.copy(raws)
-        for i in range(self.level):
+        
+        # Perform Romberg integration to refine estimates
+        for i in range(level):
+            # Calculate the divisor for the current level of refinement
             divisor = 4**(i + 1) - 1
-            level_estimates = level_estimates[:-1] - np.diff(level_estimates) / divisor
-            estimates.append(level_estimates[0])
+            # Refine the estimates using the Romberg formula
+            # np.diff(raws) computes the difference between consecutive elements
+            # Subtract the refined differences in place
+            raws[:-1] = raws[:-1] - np.diff(raws) / divisor
+            # Append the first refined estimate to the estimates list
+            estimates.append(raws[0])
+        
+        # Return the list of refined estimates
         return estimates
 
 
