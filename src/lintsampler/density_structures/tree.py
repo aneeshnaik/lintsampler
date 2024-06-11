@@ -170,7 +170,7 @@ class DensityTree(DensityStructure):
 
         return mins, maxs, corners
 
-    def refine_by_error(self, leaf_tol, tree_tol, verbose=False):
+    def refine_by_error(self, tree_tol, leaf_tol=0.01, leaf_mass_contribution_tol=0.01, verbose=False):
         """Refine the tree by opening leaves with large estimated mass errors.
 
         Refinement uses a strategy based on Romberg integration, and happens
@@ -183,16 +183,21 @@ class DensityTree(DensityStructure):
 
         Parameters
         ----------
-        leaf_tol : float
-            Individual leaf error tolerance level used in the first refinement
-            loop. This is a *fractional* error, i.e., a leaf is opened if
-            the leaf's mass error divided by the leaf's mass is above this
-            threshold.
         tree_tol : float
             Total tree error tolerance level used in the second refinement
             loop. This is a *fractional* error, i.e., a leaf is opened if
             the tree's total mass error divided by the tree's total mass is
             above this threshold.
+        leaf_tol : float, optional
+            Individual leaf error tolerance level used in the first refinement
+            loop. This is a *fractional* error, i.e., a leaf is opened if
+            the leaf's mass error divided by the leaf's mass is above this
+            threshold. Default: 0.01, or 1% fractional mass error per leaf.
+        leaf_mass_contribution_tol: float, optional
+            Individual leaf fractional mass below which the leav will not be 
+            refined. The parameter acts as a prefactor to compare leaves to the
+            mean mass of all leaves in the tree. Default: 0.01, or leaves with
+            1% of the mass of the mean leaf.
         verbose : bool, optional
             If True, print messages at every loop iteration. Default: False. 
 
@@ -213,23 +218,43 @@ class DensityTree(DensityStructure):
         
         # LEAF LOOP:
         # repeatedly loop over leaves until each leaf has converged Romberg mass
-        leaves_converged = True
+        # Initialize the convergence flag and counter
+        leaves_converged = False
         counter = 0
+        
+        # Initialize arrays for masses and errors
+        masses_romberg = np.array([leaf.mass_romberg for leaf in self.leaves])
+        errors = np.array([np.abs(np.diff(leaf.romberg_estimates)[-1]) for leaf in self.leaves])
+
         while not leaves_converged:
             counter += 1
             new_leaves = []
             leaves_converged = True
-            for leaf in self.leaves:
-                err = np.abs(np.diff(leaf.romberg_estimates)[-1])
-                if err > leaf_tol * leaf.mass_romberg:
-                    leaves_converged = False
+            
+            # Check if any leaf does not meet the convergence criterion
+            non_converged_indices = np.where( (errors > leaf_tol * masses_romberg) &
+                                              (masses_romberg > leaf_mass_contribution_tol * np.nanmean(masses_romberg)))[0]
+
+            if len(non_converged_indices) > 0:
+                leaves_converged = False
+                # Iterate over non-converged leaves in reverse order to avoid index issues when deleting
+                for i in reversed(non_converged_indices):
+                    leaf = self.leaves.pop(i)
                     leaf.create_children(self.batch)
                     new_leaves += list(leaf.children)
-                else:
-                    new_leaves.append(leaf)
-            self.leaves = new_leaves
+                    # Delete the non-converged leaf's mass and error
+                    masses_romberg = np.delete(masses_romberg, i)
+                    errors = np.delete(errors, i)
+                # Add new leaves to the tree
+                self.leaves += new_leaves
+                # Append new leaves' masses and errors
+                new_masses_romberg = np.array([leaf.mass_romberg for leaf in new_leaves])
+                new_errors = np.array([np.abs(np.diff(leaf.romberg_estimates)[-1]) for leaf in new_leaves])
+                masses_romberg = np.concatenate((masses_romberg, new_masses_romberg))
+                errors = np.concatenate((errors, new_errors))
+            
             if verbose:
-                print(f"End of leaf iteration {counter}: {len(self.leaves)} leaves on tree. Total mass={self.total_mass}")
+                print(f"End of leaf iteration {counter}: {len(self.leaves)} leaves on tree. Total mass={np.sum(masses_romberg)}, with mean leaf mass={np.nanmean(masses_romberg)}")
 
         # TREE LOOP:
         # repeatedly open most erroneous leaf in tree until whole tree converged
