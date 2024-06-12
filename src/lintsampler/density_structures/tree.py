@@ -521,35 +521,21 @@ class _TreeCell:
         level = self.level
         idx = self.idx
 
-        # Collect raw estimates from the current object and its ancestors
+        raws = [self.mass_raw]
         ancestor = self
-        raws = [ancestor.mass_raw] + [
-            (ancestor := ancestor.parent).estimate_descendant_mass(idx, level)
-            for _ in range(level)
-        ]
+        for i in range(self.level):
+            ancestor = ancestor.parent
+            raws.append(ancestor.estimate_descendant_mass(idx, level))
         raws = np.array(raws)
-        
-        # Initialize estimates with the first raw estimate
-        estimates = [raws[0]]
-        
-        # Perform Romberg integration to refine estimates
-        for i in range(level):
-            # Calculate the divisor for the current level of refinement
-            divisor = 4**(i + 1) - 1
-            # Refine the estimates using the Romberg formula
-            # np.diff(raws) computes the difference between consecutive elements
-            # Subtract the refined differences in place
-            raws[:-1] = raws[:-1] - np.diff(raws) / divisor
-            # Append the first refined estimate to the estimates list
 
-            # A guard for particularly bad estimates
-            if raws[0] < 0:
-                estimates.append(0.0)
-            else:
-                estimates.append(raws[0])
-        
-        # Return the list of refined estimates
+        estimates = [raws[0]]
+        level_estimates = np.copy(raws)
+        for i in range(level):
+            divisor = 4**(i + 1) - 1
+            level_estimates = level_estimates[:-1] - np.diff(level_estimates) / divisor
+            estimates.append(level_estimates[0])
         return estimates
+
 
 
 class _GridCache:
