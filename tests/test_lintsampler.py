@@ -76,6 +76,7 @@ def nonfinite_kD_pdf_nonvec(x):
 @pytest.mark.parametrize("pdf,cells", [
         (neg_pdf_1D, X_EDGES),
         (neg_pdf_2D, (X_EDGES, Y_EDGES)),
+        (neg_pdf_2D, TREE_2D),
 ])
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
 def test_f_negative(pdf, cells, vectorizedpdf):
@@ -89,6 +90,7 @@ def test_f_negative(pdf, cells, vectorizedpdf):
         (nonfinite_1D_pdf_vec, X_EDGES, True),
         (nonfinite_kD_pdf_nonvec, (X_EDGES, Y_EDGES), False),
         (nonfinite_kD_pdf_vec, (X_EDGES, Y_EDGES), True),
+        (nonfinite_kD_pdf_vec, TREE_2D, True)
 ])
 def test_f_nonfinite(pdf, cells, vectorizedpdf):
     """Test error raised if f non-finite anywhere"""
@@ -103,6 +105,9 @@ def test_f_nonfinite(pdf, cells, vectorizedpdf):
         (lambda x: np.ones(2), (X_EDGES, Y_EDGES), False),
         (lambda x: 1.0, (X_EDGES, Y_EDGES), True),
         (lambda x: np.ones((len(x), 2)), (X_EDGES, Y_EDGES), True),
+        (lambda x: np.ones(2), TREE_2D, False),
+        (lambda x: 1.0, TREE_2D, True),
+        (lambda x: np.ones((len(x), 2)), TREE_2D, True),
 ])
 def test_f_bad_shape(pdf, cells, vectorizedpdf):
     """Test error raised if f returns inappropriate shape"""
@@ -110,11 +115,11 @@ def test_f_bad_shape(pdf, cells, vectorizedpdf):
         LintSampler(domain=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
 
 
-def test_unnecessary_pdf_setting():
+@pytest.mark.parametrize("domain", [GRID_2D, TREE_2D])
+def test_unnecessary_pdf_setting(domain):
     """Test warning raised if extraneous setting passed to None PDF"""
-    grid = DensityGrid(X_EDGES, pdf=norm.pdf, vectorizedpdf=True)
     with pytest.warns(UserWarning):
-        LintSampler(domain=grid, vectorizedpdf=True)
+        LintSampler(domain=domain, vectorizedpdf=True)
 
 
 @pytest.mark.parametrize("pdf", [True, 10, np.random.default_rng(42)])
@@ -122,6 +127,20 @@ def test_noncallable_pdf(pdf):
     """Test error raised if PDF is not a callable"""
     with pytest.raises(TypeError):
         LintSampler(domain=X_EDGES, pdf=pdf)
+
+
+@pytest.mark.parametrize("pdf", [True, 10, np.random.default_rng(42)])
+def test_noncallable_pdf_tree(pdf):
+    """Test error raised if PDF is not a callable"""
+    with pytest.raises(TypeError):
+        DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=pdf)
+
+
+@pytest.mark.parametrize("domain", [X_EDGES, [X0_EDGES, X1_EDGES]])
+def test_no_pdf(domain):
+    """Test error raised if None PDF but no preconstructed DensityStructure"""
+    with pytest.raises(ValueError):
+        LintSampler(domain=domain)
 
 
 ## INPUT CHECKING: SEED ########################################################
@@ -192,6 +211,19 @@ def test_kD_edges_non_monotonic(cells):
         LintSampler(domain=cells, pdf=dist.pdf)
 
 
+def test_1D_tree_non_monotonic():
+    """Test error raised if 1D tree mins/maxs not monotonic"""
+    with pytest.raises(ValueError):
+        DensityTree(mins=4, maxs=3, pdf=norm.pdf)
+
+        
+def test_kD_tree_non_monotonic():
+    """Test error raised if kD tree mins/maxs not monotonic"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    with pytest.raises(ValueError):
+        DensityTree(mins=[10, 4], maxs=[20, 3], pdf=dist.pdf)
+
+
 @pytest.mark.parametrize("cells", [
     B3, tuple(B3), list(B3),
     B4, tuple(B4), list(B4),
@@ -219,6 +251,21 @@ def test_kD_edges_non_finite(cells):
         LintSampler(domain=cells, pdf=dist.pdf)
 
 
+@pytest.mark.parametrize("maxs", [np.nan, np.inf])
+def test_1D_tree_non_finite(maxs):
+    """Test error raised if 1D tree mins/maxs not finite"""
+    with pytest.raises(ValueError):
+        DensityTree(mins=4, maxs=maxs, pdf=norm.pdf)
+
+
+@pytest.mark.parametrize("maxs", [[20, np.nan], [20, np.inf]])        
+def test_kD_tree_non_finite(maxs):
+    """Test error raised if kD tree mins/maxs not finite"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    with pytest.raises(ValueError):
+        DensityTree(mins=[10, 4], maxs=maxs, pdf=dist.pdf)
+
+
 def test_1D_edges_overlapping():
     """Test error raised if distinct 1D grids are overlapping"""
     cells = [np.array([1.9, 2.4, 2.9]), np.array([1.0, 1.5, 2.0])]
@@ -234,6 +281,24 @@ def test_kD_edges_overlapping(cells):
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
     with pytest.raises(ValueError):
         LintSampler(domain=cells, pdf=dist.pdf)
+
+
+def test_1D_trees_overlapping():
+    """Test error raised if distinct 1D trees are overlapping"""
+    tree1 = DensityTree(mins=-20, maxs=0, pdf=norm.pdf)
+    tree2 = DensityTree(mins=-5, maxs=15, pdf=norm.pdf)
+    with pytest.raises(ValueError):
+        LintSampler(domain=[tree1, tree2])
+
+
+def test_kD_trees_overlapping():
+    """Test error raised if distinct kD trees are overlapping"""
+    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    tree1 = DensityTree(mins=[-5, -5], maxs=[0, 0], pdf=dist.pdf)
+    tree2 = DensityTree(mins=[-1, -1], maxs=[4, 4], pdf=dist.pdf)
+    with pytest.raises(ValueError):
+        LintSampler(domain=[tree1, tree2])
+
 
 @pytest.mark.parametrize("cells", [
     [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]))],

@@ -19,12 +19,7 @@ def _get_grid_origin_from_cell_idx(idx, level, dim):
     origin : numpy.ndarray
         The integer grid coordinates of the origin of the specified cell in the
         grid. The returned array has a shape of (dim,) and dtype of np.int64.
-    """
-    
-    # check that given idx makes sense
-    if not (0 <= idx < 2**(level * dim)):
-        raise ValueError("`idx` must be in the range [0, 2**(level * dim))")
-    
+    """    
     # if at root level, give zeros, otherwise go up a level
     if level == 0:
         return np.zeros(dim, dtype=np.int64)
