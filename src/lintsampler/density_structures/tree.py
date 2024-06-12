@@ -78,19 +78,28 @@ class DensityTree(DensityStructure):
             mins = np.array(mins)
             maxs = np.array(maxs)
 
-        # check mins/maxs shapes make sense
-        if mins.ndim != 1:
-            raise ValueError(
-                "DensityTree.__init__: Need one-dimensional array of minima."
-            )
-        if maxs.ndim != 1:
-            raise ValueError(
-                "DensityTree.__init__: Need one-dimensional array of maxima."
-            )
+        # check same length
         if len(maxs) != len(mins):
             raise ValueError(
                 "DensityTree.__init__: mins and maxs have different lengths."
             )
+
+        # check mins/maxs all monotonic, finite-valued, 1D
+        for arr in [mins, maxs]:
+            if arr.ndim != 1:
+                raise ValueError(
+                    "DensityTree.__init__: Need 1D array of minima/maxima."
+                )
+            if np.any((maxs - mins) <= 0):
+                raise ValueError(
+                    "DensityTree.__init__: "\
+                    "Coordinates not monotically increasing."
+                )
+            if not np.all(np.isfinite(arr)):
+                raise ValueError(
+                    "DensityTree.__init__: "\
+                    "Coordinates not finite-valued."
+                )
 
         # save mins/maxs/dim as private attrs (made public via properties)
         self._mins = np.array(mins)
@@ -408,6 +417,16 @@ class _TreeCell:
         # calculate corner densities
         self.corner_densities = self.grid.eval(self._get_grid_corners(), self.level, self.usecache)
         
+        # check densities all non-negative and finite
+        if np.any(self.corner_densities < 0):
+            raise ValueError(
+                "_TreeCell._evaluate_cell: Densities can't be negative"
+            )
+        if not np.all(np.isfinite(self.corner_densities)):
+            raise ValueError(
+                "_TreeCell._evaluate_cell: Detected non-finite density"
+            )
+        
         # trapezoid mass = volume * average(density)
         self.mass_raw = self.vol * np.average(self.corner_densities)
         
@@ -633,16 +652,28 @@ class _GridCache:
                 
                 # if 1D, squeeze (N, 1) -> (N)
                 if self.dim == 1:
-                    pos = pos.squeeze()
+                    pos = pos[..., 0]
 
                 if self.vectorizedpdf:
-                    densities[~m_cached] = self.pdf(pos,*self.pdf_args,**self.pdf_kwargs)
+                    try:
+                        densities[~m_cached] = self.pdf(pos,*self.pdf_args,**self.pdf_kwargs)
+                    except TypeError:
+                        raise ValueError(
+                            "_GridCache._eval: "\
+                            "pdf function does not return appropriate shape."
+                        )
 
                 else:
                     new_densities = []
                     for xi in pos:
                         new_densities.append(self.pdf(xi,*self.pdf_args,**self.pdf_kwargs))
-                    densities[~m_cached] = np.array(new_densities)
+                    try:
+                        densities[~m_cached] = np.array(new_densities)
+                    except TypeError:
+                        raise ValueError(
+                            "_GridCache._eval: "\
+                            "pdf function does not return appropriate shape."
+                        )
 
                 for i, corner in enumerate(corners[~m_cached]):
                     self._cache(corner, level, densities[~m_cached][i])

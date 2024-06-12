@@ -27,7 +27,7 @@ CELLS_2D = [
     [(list(X0_EDGES), list(Y0_EDGES)), (list(X0_EDGES), list(Y1_EDGES)), (list(X1_EDGES), list(Y0_EDGES)), (list(X1_EDGES), list(Y1_EDGES))],
 ]
 GRID_1D = DensityGrid(X_EDGES, pdf=norm.pdf, vectorizedpdf=True)
-#TREE_1D = DensityTree(np.array([-10]), np.array([10]), pdf=norm.pdf, vectorizedpdf=True)
+TREE_1D = DensityTree(np.array([-10]), np.array([10]), pdf=norm.pdf, vectorizedpdf=True)
 GRID_2D = DensityGrid((X_EDGES, Y_EDGES), pdf=multivariate_normal(np.zeros(2), np.eye(2)).pdf, vectorizedpdf=True)
 TREE_2D = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=multivariate_normal(np.zeros(2), np.eye(2)).pdf, vectorizedpdf=True)
 B0 = np.array([1.0, 1.5, 1.5, 2.0])
@@ -76,7 +76,6 @@ def nonfinite_kD_pdf_nonvec(x):
 @pytest.mark.parametrize("pdf,cells", [
         (neg_pdf_1D, X_EDGES),
         (neg_pdf_2D, (X_EDGES, Y_EDGES)),
-        (neg_pdf_2D, TREE_2D),
 ])
 @pytest.mark.parametrize("vectorizedpdf", [True, False])
 def test_f_negative(pdf, cells, vectorizedpdf):
@@ -85,17 +84,32 @@ def test_f_negative(pdf, cells, vectorizedpdf):
         LintSampler(domain=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
 
 
+@pytest.mark.parametrize("vectorizedpdf", [True, False])
+def test_f_negative_tree(vectorizedpdf):
+    """Test error raised if f negative anywhere with tree"""
+    with pytest.raises(ValueError):
+        tree = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=neg_pdf_2D, vectorizedpdf=vectorizedpdf)
+        LintSampler(domain=tree)
+
+
 @pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
         (nonfinite_1D_pdf_nonvec, X_EDGES, False),
         (nonfinite_1D_pdf_vec, X_EDGES, True),
         (nonfinite_kD_pdf_nonvec, (X_EDGES, Y_EDGES), False),
         (nonfinite_kD_pdf_vec, (X_EDGES, Y_EDGES), True),
-        (nonfinite_kD_pdf_vec, TREE_2D, True)
 ])
 def test_f_nonfinite(pdf, cells, vectorizedpdf):
     """Test error raised if f non-finite anywhere"""
     with pytest.raises(ValueError):
         LintSampler(domain=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
+
+
+@pytest.mark.parametrize("pdf,vectorizedpdf", [(nonfinite_kD_pdf_vec, True), (nonfinite_kD_pdf_nonvec, False)])
+def test_f_nonfinite_tree(pdf, vectorizedpdf):
+    """Test error raised if f non-finite anywhere with tree"""
+    with pytest.raises(ValueError):
+        tree = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=pdf, vectorizedpdf=vectorizedpdf)
+        LintSampler(domain=tree)
 
 
 @pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
@@ -105,14 +119,22 @@ def test_f_nonfinite(pdf, cells, vectorizedpdf):
         (lambda x: np.ones(2), (X_EDGES, Y_EDGES), False),
         (lambda x: 1.0, (X_EDGES, Y_EDGES), True),
         (lambda x: np.ones((len(x), 2)), (X_EDGES, Y_EDGES), True),
-        (lambda x: np.ones(2), TREE_2D, False),
-        (lambda x: 1.0, TREE_2D, True),
-        (lambda x: np.ones((len(x), 2)), TREE_2D, True),
 ])
 def test_f_bad_shape(pdf, cells, vectorizedpdf):
     """Test error raised if f returns inappropriate shape"""
     with pytest.raises(ValueError):
         LintSampler(domain=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
+
+
+@pytest.mark.parametrize("pdf,vectorizedpdf", [
+        (lambda x: np.ones(2), False),
+        (lambda x: np.ones((len(x), 2)), True),
+])
+def test_f_bad_shape_tree(pdf, vectorizedpdf):
+    """Test error raised if f returns inappropriate shape"""
+    with pytest.raises(ValueError):
+        tree = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=pdf, vectorizedpdf=vectorizedpdf)
+        LintSampler(domain=tree)
 
 
 @pytest.mark.parametrize("domain", [GRID_2D, TREE_2D])
@@ -300,16 +322,19 @@ def test_kD_trees_overlapping():
         LintSampler(domain=[tree1, tree2])
 
 
-@pytest.mark.parametrize("cells", [
-    [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]))],
-    [GRID_1D, GRID_2D],
-#TODO    [TREE_1D, TREE_2D],
+@pytest.mark.parametrize("preconstructed,cells", [
+    (False, [(X0_EDGES, Y0_EDGES), (X0_EDGES, Y1_EDGES, np.array([3., 4., 5.]))]),
+    (True, [GRID_1D, GRID_2D]),
+    (True, [TREE_1D, TREE_2D]),
 ])
-def test_kD_mismatched_dims(cells):
+def test_kD_mismatched_dims(preconstructed, cells):
     """Test error raised if distinct kD grids have mismatched dimensions"""
-    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
+    if preconstructed:
+        pdf = None
+    else:
+        pdf = multivariate_normal(mean=np.ones(2), cov=np.eye(2)).pdf        
     with pytest.raises(ValueError):
-        LintSampler(domain=cells, pdf=dist.pdf)
+        LintSampler(domain=cells, pdf=pdf)
 
 @pytest.mark.parametrize("cells", [
     [(X0_EDGES, Y0_EDGES), GRID_2D],
