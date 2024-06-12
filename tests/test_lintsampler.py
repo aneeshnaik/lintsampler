@@ -602,7 +602,7 @@ def test_1D_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     assert (mu, sig) == (mu_true, sig_true)
 
 
-@pytest.mark.parametrize("min_openings,refine,tree_tol", [(4, False, None), (2, True, 1e-3)])
+@pytest.mark.parametrize("min_openings,refine,tree_tol", [(5, False, None), (2, True, 1e-3)])
 def test_1D_gaussian_tree(min_openings, refine, tree_tol):
     """Test samples from a 1D gaussian have correct mean and variance with preconstructed DensityTree"""
     mu_true = -2.0
@@ -669,7 +669,7 @@ def test_kD_gaussian_tree(vectorizedpdf, min_openings, refine, tree_tol):
         min_openings=min_openings
     )
     if refine:
-        tree.refine_by_error(tree_tol=tree_tol, leaf_tol=None, verbose=True)
+        tree.refine_by_error(tree_tol=tree_tol)
     sampler = LintSampler(domain=tree)
     x = sampler.sample(N=2**18)
 

@@ -3,7 +3,7 @@ from functools import reduce
 from .base import DensityStructure
 from ..utils import _choice, _get_hypercube_corners, _get_grid_origin_from_cell_idx
 
-#TODO refine by location
+
 class DensityTree(DensityStructure):
     """Tree-like object over which density function is evaluated.
 
@@ -70,6 +70,14 @@ class DensityTree(DensityStructure):
         vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
         min_openings=0, usecache=True, batch=False
     ):
+        # cast to arrays
+        if not hasattr(mins, "__len__"):
+            mins = np.array([mins])
+            maxs = np.array([maxs])
+        else:
+            mins = np.array(mins)
+            maxs = np.array(maxs)
+
         # check mins/maxs shapes make sense
         if mins.ndim != 1:
             raise ValueError(
@@ -623,6 +631,9 @@ class _GridCache:
             if not m_cached.all():
                 pos = self.convert_corners_to_pos(corners[~m_cached], level)
                 
+                # if 1D, squeeze (N, 1) -> (N)
+                if self.dim == 1:
+                    pos = pos.squeeze()
 
                 if self.vectorizedpdf:
                     densities[~m_cached] = self.pdf(pos,*self.pdf_args,**self.pdf_kwargs)
