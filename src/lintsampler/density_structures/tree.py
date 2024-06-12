@@ -1,5 +1,6 @@
 import numpy as np
 from functools import reduce
+from warnings import warn
 from .base import DensityStructure
 from ..utils import _choice, _get_hypercube_corners, _get_grid_origin_from_cell_idx
 
@@ -100,19 +101,26 @@ class DensityTree(DensityStructure):
                     "DensityTree.__init__: "\
                     "Coordinates not finite-valued."
                 )
+        
+        # warn user if cache and batch both True
+        if batch and usecache:
+            warn(
+                "DensityTree.__init__: " \
+                "`usecache` set to True but cache not used if `batch=True`"
+            )
 
         # save mins/maxs/dim as private attrs (made public via properties)
         self._mins = np.array(mins)
         self._maxs = np.array(maxs)
         self._dim = len(mins)
-        self._usecache = usecache
+        self.usecache = usecache
         self.batch = batch
 
         # construct density cache
         gc = _GridCache(mins, maxs, pdf, vectorizedpdf, pdf_args, pdf_kwargs)
 
         # set root cell
-        self.root = _TreeCell(parent=None, idx=0, level=0, grid=gc, usecache=self._usecache)
+        self.root = _TreeCell(parent=None, idx=0, level=0, grid=gc, usecache=self.usecache)
         
         # full openings
         leaves = [self.root]

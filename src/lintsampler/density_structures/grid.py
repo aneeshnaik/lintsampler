@@ -1,6 +1,5 @@
 import numpy as np
 from functools import reduce
-from warnings import warn
 from ..utils import _is_1D_iterable, _choice
 from .base import DensityStructure
 

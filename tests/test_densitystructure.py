@@ -2,8 +2,8 @@ import numpy as np
 from lintsampler import DensityStructure
 
 
-def test_datastructure():
-    """Test abstract data structure returns None for all methods/attributes.
+def test_densitystructure():
+    """Test abstract density structure returns None for all methods/attributes.
     
     This is a slightly hacky solution to the problem that the abstractmethods
     of abstract base classes don't get covered by pytest tests because the
