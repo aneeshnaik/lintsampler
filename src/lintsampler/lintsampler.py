@@ -8,13 +8,13 @@ from .sampling import _grid_sample
 
 
 class LintSampler:
-    """Linear interpolant sampler for density function defined on grid(s).
+    """Linear interpolant sampler for arbitrary probability density function.
 
     ``LintSampler`` takes a primary argument, ``domain``, which is the region
     within which sampling takes place. After instantiation, the ``sample``
     method realises the random sampling of the given ``pdf`` on the domain. The
     sampling may either take place at random (default), or in a low-discrepancy
-    sequence (with `qmc=True`).
+    sequence (with ``qmc=True``).
  
     See the parameters below for additional control options, and further
     examples below for the various usage patterns.
