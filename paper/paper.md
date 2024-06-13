@@ -32,7 +32,7 @@ bibliography: paper.bib
 
 # Statement of need
 
-For a small number of well-studied probability distributions, optimised algorithms exist to draw samples cheaply. However, one often wishes to draw samples from an arbitrary PDF for which no such algorithm is available. In such situations, the method of choice is typically some flavour of Markov Chain Monte Carlo (MCMC), a powerful class of methods with many excellent Python implementations [@emcee.paper;@pymc.paper;@sgmcmcjax.paper,@pxmcmc.paper] **(more?)**. One drawback of MCMC techniques is that they typically require a degree of tuning during the setup (e.g. choice of proposal distribution, initial walker positions, etc.), and a degree of inspection afterward to check for convergence. This additional work is a price worth paying for many use cases, but can feel excessive in scenarios where the user is less concerned with strict sampling accuracy or minimising PDF evaluations, and would prefer a simpler means to generate an approximate sample.
+For a small number of well-studied probability distributions, optimised algorithms exist to draw samples cheaply. However, one often wishes to draw samples from an arbitrary PDF for which no such algorithm is available. In such situations, the method of choice is typically some flavour of Markov Chain Monte Carlo (MCMC), a powerful class of methods with many excellent Python implementations [@emcee.paper;@pymc.paper;@sgmcmcjax.paper,@pxmcmc.paper]. One drawback of MCMC techniques is that they typically require a degree of tuning during the setup (e.g. choice of proposal distribution, initial walker positions, etc.), and a degree of inspection afterward to check for convergence. This additional work is a price worth paying for many use cases, but can feel excessive in scenarios where the user is less concerned with strict sampling accuracy or minimising PDF evaluations, and would prefer a simpler means to generate an approximate sample.
 
 `lintsampler` was designed with such situations in mind. In the simplest use case, the user need only provide a PDF function and some one-dimensional arrays representing a grid, and a set of samples will be generated. Compared with MCMC, there is rather less work involved on the part of the user, but there compensating disadvantages. First, some care needs to be taken to ensure the grid has sufficient resolution for the use case. Second, in high dimensional scenarios with finely resolved grids, the PDF might well be evaluated many more times than with MCMC.
 
@@ -48,7 +48,7 @@ Documentation for `lintsampler`, including example notebooks demonstrating a ran
 
 # Acknowledgements
 
-MSP acknowledges funding support from a UKRI Stephen Hawking Fellowship.
+We would like to thank Sergey Koposov for useful discussions. APN acknowledges funding support from an Early Career Fellowship from the Leverhulme Trust. MSP acknowledges funding support from a UKRI Stephen Hawking Fellowship.
 
 
 # References
