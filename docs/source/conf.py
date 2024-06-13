@@ -17,3 +17,9 @@ myst_enable_extensions = [
 myst_heading_anchors = 2
 nb_execution_timeout = 120
 numpydoc_class_members_toctree = False
+
+# set the logo
+html_logo = "assets/lintsamplerlogo.png"  
+
+# set favicon: update later? also make dark version
+html_favicon = "assets/lintsamplerlogo.png"
