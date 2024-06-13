@@ -26,16 +26,16 @@ CELLS_2D = [
     [(tuple(X0_EDGES), tuple(Y0_EDGES)), (tuple(X0_EDGES), tuple(Y1_EDGES)), (tuple(X1_EDGES), tuple(Y0_EDGES)), (tuple(X1_EDGES), tuple(Y1_EDGES))],
     [(list(X0_EDGES), list(Y0_EDGES)), (list(X0_EDGES), list(Y1_EDGES)), (list(X1_EDGES), list(Y0_EDGES)), (list(X1_EDGES), list(Y1_EDGES))],
 ]
+PDF_2D = multivariate_normal(np.zeros(2), np.eye(2)).pdf
 GRID_1D = DensityGrid(X_EDGES, pdf=norm.pdf, vectorizedpdf=True)
 TREE_1D = DensityTree(np.array([-10]), np.array([10]), pdf=norm.pdf, vectorizedpdf=True)
-GRID_2D = DensityGrid((X_EDGES, Y_EDGES), pdf=multivariate_normal(np.zeros(2), np.eye(2)).pdf, vectorizedpdf=True)
-TREE_2D = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=multivariate_normal(np.zeros(2), np.eye(2)).pdf, vectorizedpdf=True)
+GRID_2D = DensityGrid((X_EDGES, Y_EDGES), pdf=PDF_2D, vectorizedpdf=True)
+TREE_2D = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=PDF_2D, vectorizedpdf=True)
 B0 = np.array([1.0, 1.5, 1.5, 2.0])
 B1 = np.ones(10)
 B2 = np.array([9.0, 8.0, 10.0, 12.0])
 B3 = np.array([1.0, 1.5, np.nan])
 B4 = np.array([1.0, 1.5, np.inf])
-
 
 
 def neg_pdf_1D(x):
@@ -84,14 +84,6 @@ def test_f_negative(pdf, cells, vectorizedpdf):
         LintSampler(domain=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
 
 
-@pytest.mark.parametrize("vectorizedpdf", [True, False])
-def test_f_negative_tree(vectorizedpdf):
-    """Test error raised if f negative anywhere with tree"""
-    with pytest.raises(ValueError):
-        tree = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=neg_pdf_2D, vectorizedpdf=vectorizedpdf)
-        LintSampler(domain=tree)
-
-
 @pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
         (nonfinite_1D_pdf_nonvec, X_EDGES, False),
         (nonfinite_1D_pdf_vec, X_EDGES, True),
@@ -102,14 +94,6 @@ def test_f_nonfinite(pdf, cells, vectorizedpdf):
     """Test error raised if f non-finite anywhere"""
     with pytest.raises(ValueError):
         LintSampler(domain=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
-
-
-@pytest.mark.parametrize("pdf,vectorizedpdf", [(nonfinite_kD_pdf_vec, True), (nonfinite_kD_pdf_nonvec, False)])
-def test_f_nonfinite_tree(pdf, vectorizedpdf):
-    """Test error raised if f non-finite anywhere with tree"""
-    with pytest.raises(ValueError):
-        tree = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=pdf, vectorizedpdf=vectorizedpdf)
-        LintSampler(domain=tree)
 
 
 @pytest.mark.parametrize("pdf,cells,vectorizedpdf", [
@@ -126,15 +110,20 @@ def test_f_bad_shape(pdf, cells, vectorizedpdf):
         LintSampler(domain=cells, pdf=pdf, vectorizedpdf=vectorizedpdf)
 
 
-@pytest.mark.parametrize("pdf,vectorizedpdf", [
-        (lambda x: np.ones(2), False),
-        (lambda x: np.ones((len(x), 2)), True),
+@pytest.mark.parametrize("domain", [
+    GRID_2D,
+    TREE_2D,
+    [
+        DensityGrid((X0_EDGES, Y0_EDGES), pdf=PDF_2D, vectorizedpdf=True),
+        DensityGrid((X0_EDGES, Y1_EDGES), pdf=PDF_2D, vectorizedpdf=True),
+        DensityGrid((X1_EDGES, Y0_EDGES), pdf=PDF_2D, vectorizedpdf=True),
+        DensityGrid((X1_EDGES, Y1_EDGES), pdf=PDF_2D, vectorizedpdf=True)
+    ]
 ])
-def test_f_bad_shape_tree(pdf, vectorizedpdf):
-    """Test error raised if f returns inappropriate shape"""
-    with pytest.raises(ValueError):
-        tree = DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=pdf, vectorizedpdf=vectorizedpdf)
-        LintSampler(domain=tree)
+def test_extraneous_pdf(domain):
+    """Test warning raised if extraneous setting passed to None PDF"""
+    with pytest.warns(UserWarning):
+        LintSampler(domain=domain, pdf=PDF_2D)
 
 
 @pytest.mark.parametrize("domain", [GRID_2D, TREE_2D])
@@ -149,13 +138,6 @@ def test_noncallable_pdf(pdf):
     """Test error raised if PDF is not a callable"""
     with pytest.raises(TypeError):
         LintSampler(domain=X_EDGES, pdf=pdf)
-
-
-@pytest.mark.parametrize("pdf", [True, 10, np.random.default_rng(42)])
-def test_noncallable_pdf_tree(pdf):
-    """Test error raised if PDF is not a callable"""
-    with pytest.raises(TypeError):
-        DensityTree(np.array([-10, -5]), np.array([10, 5]), pdf=pdf)
 
 
 @pytest.mark.parametrize("domain", [X_EDGES, [X0_EDGES, X1_EDGES]])
@@ -233,19 +215,6 @@ def test_kD_edges_non_monotonic(cells):
         LintSampler(domain=cells, pdf=dist.pdf)
 
 
-def test_1D_tree_non_monotonic():
-    """Test error raised if 1D tree mins/maxs not monotonic"""
-    with pytest.raises(ValueError):
-        DensityTree(mins=4, maxs=3, pdf=norm.pdf)
-
-        
-def test_kD_tree_non_monotonic():
-    """Test error raised if kD tree mins/maxs not monotonic"""
-    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    with pytest.raises(ValueError):
-        DensityTree(mins=[10, 4], maxs=[20, 3], pdf=dist.pdf)
-
-
 @pytest.mark.parametrize("cells", [
     B3, tuple(B3), list(B3),
     B4, tuple(B4), list(B4),
@@ -271,21 +240,6 @@ def test_kD_edges_non_finite(cells):
     dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
     with pytest.raises(ValueError):
         LintSampler(domain=cells, pdf=dist.pdf)
-
-
-@pytest.mark.parametrize("maxs", [np.nan, np.inf])
-def test_1D_tree_non_finite(maxs):
-    """Test error raised if 1D tree mins/maxs not finite"""
-    with pytest.raises(ValueError):
-        DensityTree(mins=4, maxs=maxs, pdf=norm.pdf)
-
-
-@pytest.mark.parametrize("maxs", [[20, np.nan], [20, np.inf]])        
-def test_kD_tree_non_finite(maxs):
-    """Test error raised if kD tree mins/maxs not finite"""
-    dist = multivariate_normal(mean=np.ones(2), cov=np.eye(2))
-    with pytest.raises(ValueError):
-        DensityTree(mins=[10, 4], maxs=maxs, pdf=dist.pdf)
 
 
 def test_1D_edges_overlapping():
@@ -677,9 +631,9 @@ def test_kD_gaussian(cells, vectorizedpdf, qmc, qmc_engine):
     cov = np.round(np.cov(x.T), decimals=1)
     assert np.all(mu == mu_true) and np.all(cov == cov_true)
 
-@pytest.mark.parametrize("vectorizedpdf", [True, False])
+
 @pytest.mark.parametrize("min_openings,refine,tree_tol", [(6, False, None), (3, True, 1e-4)])
-def test_kD_gaussian_tree(vectorizedpdf, min_openings, refine, tree_tol):
+def test_kD_gaussian_tree(min_openings, refine, tree_tol):
 
     mu_true = np.array([1.5, -0.5])
     cov_true = np.array([
@@ -690,7 +644,7 @@ def test_kD_gaussian_tree(vectorizedpdf, min_openings, refine, tree_tol):
 
     tree = DensityTree(
         mins=np.array([-10, -5]), maxs=np.array([10, 5]),
-        pdf=dist.pdf, vectorizedpdf=vectorizedpdf,
+        pdf=dist.pdf, vectorizedpdf=True,
         min_openings=min_openings
     )
     if refine:

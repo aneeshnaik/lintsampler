@@ -364,8 +364,10 @@ class DensityTree(DensityStructure):
 
         Parameters
         ----------
-        pos : 1D array-like
-            Position at which to get leaf cell. Length should be tree.ndim.
+        pos : scalar or 1D iterable
+            Position at which to get leaf cell. Can be scalar or length-1
+            iterable in 1D, otherwise should be iterable with length equal to
+            dimensionality of tree (``tree.dim``).
 
         Returns
         -------
@@ -373,7 +375,10 @@ class DensityTree(DensityStructure):
             Leaf cell containing given position.        
         """
         # cast position to numpy array
-        pos = np.array(pos)
+        if not hasattr(pos, "__len__"):
+            pos = np.array([pos])
+        else:        
+           pos = np.array(pos)
 
         # check shape makes sense
         if pos.shape != (self._dim,):
@@ -385,10 +390,13 @@ class DensityTree(DensityStructure):
         # rescale position to unit cube, check falls inside tree        
         rpos = (pos - self.mins) / (self.maxs - self.mins)
         if not np.all((rpos >= 0) & (rpos <= 1)):
-            raise ValueError("Requested pos falls outside tree.")
+            raise ValueError(
+                "DensityTree.get_leaf_at_pos: "\
+                "Requested pos falls outside tree."
+            )
 
         # start at root, walk down tree until at leaf
-        cell = self._root
+        cell = self.root
         mids = 0.5 * np.ones(self._dim)
         while cell.children:
             
@@ -407,9 +415,11 @@ class _TreeCell:
     
     def __init__(self, parent, idx, level, grid, hold_eval=False, usecache=True):
         
-        # Check cell_idx in appropriate range for level
-        if not (0 <= idx < 2**(level * grid.dim)):
-            raise ValueError(f"lintsampler.tree._TreeCell: Index {idx} is out of range for level {level} with grid dimension {grid.dim}.")
+        # check cell_idx in appropriate range for level
+        msg = f"lintsampler.tree._TreeCell: "\
+              "Index {idx} is out of range for level {level} "\
+              "with grid dimension {grid.dim}."
+        assert (0 <= idx < 2**(level * grid.dim)), msg
         
         # save arguments as attrs
         self.parent = parent
@@ -505,9 +515,6 @@ class _TreeCell:
                 children.append(_TreeCell(self, idx, self.level + 1, self.grid, usecache=self.usecache))
         
         self.children = tuple(children)
-    
-    def interpolate_pos(self, pos):
-        return self._interpolate_unitcube((pos - self.x) / self.dx)
     
     def estimate_descendant_mass(self, idx, level):
         midpt = self._get_descendant_midpoint(idx, level)
@@ -703,8 +710,6 @@ class _GridCache:
 
         else:
             densities = self.pdf(self.convert_corners_to_pos(corners, level),*self.pdf_args,**self.pdf_kwargs)
-            #densities = self.pdf(self.x,*self.pdf_args,**self.pdf_kwargs)
-
         return densities
 
     def convert_corners_to_pos(self, corners, level):
@@ -783,11 +788,10 @@ class _GridCache:
         # cast to tuple
         corner = tuple(corner)
 
-        # if corner is all even (and not at root), cache on parent level
-        # else cache on this level
-        if level != 0 and all(x % 2 == 0 for x in corner):
-            self._cache(tuple(i // 2 for i in corner), level-1, value)
-        else:
-            if level not in self._levelcaches:
-                self._levelcaches[level] = {}
-            self._levelcaches[level][corner] = value
+        # except on root, can't be even vertex (would've been cached on parent)
+        assert not (level != 0 and all(x % 2 == 0 for x in corner))
+        
+        # add to cache
+        if level not in self._levelcaches:
+            self._levelcaches[level] = {}
+        self._levelcaches[level][corner] = value
