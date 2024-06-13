@@ -1,5 +1,5 @@
-# lintsampler
-![Animation showing 'lintsampler' rendered in points.](./assets/lintsampler.gif)
+
+![Animation showing 'lintsampler' rendered in points.](./assets/lintsamplerlogo.png)
 
 When you have a density function, but you would like to create a set of sample points from that density function, you can use _linear interpolate sampling_. Using the evaluation of the density at the two endpoints of 1D interval, or the four corners of a 2D rectangle, or generally the $2^k$ vertices of a $k$-dimensional hyperbox (or a series of such hyperboxes, e.g., the cells of a $k$-dimensional grid), linear interpolant sampling is a technique to draw random samples within the hyperbox. `lintsampler` provides a Python implementation of linear interpolation sampling, using only `numpy`. The source code is a public repository on [GitHub](https://github.com/aneeshnaik/lintsampler).
 
