@@ -1,11 +1,136 @@
 import numpy as np
-import warnings
-from .gridsample import _gridsample
-from .freesample import _freesample
+from warnings import warn
+from scipy.stats.qmc import QMCEngine, Sobol
+from .density_structures.grid import DensityGrid
+from .density_structures.base import DensityStructure
+from .utils import _is_1D_iterable, _choice, _check_hyperbox_overlap, _all_are_instances
+from .sampling import _grid_sample
+
 
 class LintSampler:
-    """Draw sample(s) from density function defined for a list of cells (that may or may not be in a single grid)
+    """Linear interpolant sampler for arbitrary probability density function.
 
+    ``LintSampler`` takes a primary argument, ``domain``, which is the region
+    within which sampling takes place. After instantiation, the ``sample``
+    method realises the random sampling of the given ``pdf`` on the domain. The
+    sampling may either take place at random (default), or in a low-discrepancy
+    sequence (with ``qmc=True``).
+ 
+    See the parameters below for additional control options, and further
+    examples below for the various usage patterns.
+
+    Parameters
+    ----------
+    
+    domain : iterable or ``DensityStructure``
+        Coordinate grid(s) to draw samples over. Several forms are available. If
+        using a single coordinate grid, then ``domain`` can be any of:
+        
+        - a 1D iterable (array, list, tuple) representing the cell edges of a 1D
+          grid. So, if the grid has N cells, then the iterable should have N+1
+          elements.
+        - a tuple of 1D iterables, representing the cell edges of a kD grid. If
+          the grid has (N1, N2, ..., Nk) cells, then the tuple should have
+          length k, and the 1D arrays in the tuple should have lengths 
+          N1+1, N2+1, ..., Nk+1.
+        - a ``DensityStructure`` subclass instance. In this case, ``pdf``
+          parameter should not be set, as a PDF has already been evaluated over
+          the ``DensityStructure``.
+        
+        If using multiple (non-overlapping) coordinate grids, then ``domain``
+        should be a list of any of the above. See the examples below for the
+        various usage patterns.
+    
+    pdf : {``None``, function}, optional
+        Probability density function from which to draw samples. Function should
+        take coordinate vector (or batch of vectors if vectorized; see
+        ``vectorizedpdf`` parameter) and return (unnormalised) density (or batch
+        of densities if vectorized). Additional arguments can be passed to the
+        function via ``pdf_args`` and ``pdf_kwargs`` parameters. Default is
+        ``None``, in which case it is assumed that ``domain`` parameter 
+        comprises one instance or a list of several instances of 
+        ``DensityStructure``.
+    
+    vectorizedpdf : bool, optional
+        if ``True``, assumes that the pdf function is vectorized, i.e., it
+        accepts  (..., ``dim``)-shaped batches of coordinate vectors and returns
+        (...)-shaped batches of densities. If ``False``, assumes that the pdf
+        function simply accepts (``dim``,)-shaped coordinate vectors (or floats
+        in the univariate case) and returns single densities. Default is
+        ``False``.
+    
+    pdf_args : tuple, optional
+        Additional positional arguments to pass to pdf function; function
+        call is ``pdf(position, *pdf_args, **pdf_kwargs)``. Default is empty
+        tuple (no additional positional arguments).
+    
+    pdf_kwargs : dict, optional
+        Additional keyword arguments to pass to pdf function; function call
+        is ``pdf(position, *pdf_args, **pdf_kwargs)``. Default is empty dict
+        (no additional keyword arguments).
+    
+    seed : {``None``, int, ``numpy.random.Generator``}, optional
+        Seed for ``numpy`` random generator. Can be random generator itself,
+        in which case it is left unchanged. Can also be an integer seed for a
+        generator instance. Default is ``None``, in which case new default
+        generator is created. See ``numpy`` random generator docs for more
+        information.
+    
+    qmc : bool, optional
+        Whether to use Quasi-Monte Carlo sampling. Default is ``False``.
+    
+    qmc_engine : {``None``, ``scipy.stats.qmc.QMCEngine``}, optional
+        Quasi-Monte Carlo engine to use if ``qmc`` flag above is True. Should be
+        subclass of ``scipy`` ``QMCEngine``, e.g. ``qmc.Sobol``. Should have
+        dimensionality ``dim``+1, because first ``dim`` dimensions are used for
+        lintsampling, while last dimension is used for cell choice (this happens
+        even if only one cell is given). Default is ``None``. In that case, if
+        qmc is True, then a scrambled Sobol sequence is used.
+
+    
+    Attributes
+    ----------
+    
+    pdf : {``None``, function}
+        PDF function to evaluate on grid. ``None`` if densities pre-evaluated.
+        See corresponding parameter above.
+    
+    vectorizedpdf : bool
+        Whether ``pdf`` function is vectorized. See corresponding parameter
+        above.
+    
+    pdf_args : tuple
+        Additional positional arguments for ``pdf`` function. See corresponding
+        parameter above.
+    
+    pdf_kwargs : dict
+        Additional keyword arguments for ``pdf`` function. See corresponding
+        parameter above.
+    
+    dim : int
+        Dimensionality of PDF / coordinate space.
+    
+    grids : list
+        List of ``DensityStructure`` instances corresponding to series of
+        sampling domains passed in ``domain`` parameter. Single list element if
+        only one domain passed.
+    
+    ngrids : int
+        Number of domains to sample over (i.e., length of ``grids``
+        attribute).
+    
+    qmc : bool
+        Whether to use Quasi-Monte Carlo sampling. See corresponding parameter
+        above.
+    
+    rng : ``numpy.random.Generator``
+        Random generator used for generating samples. Used alongside Quasi-Monte
+        Carlo engine if ``qmc`` is True.
+    
+    qmc_engine : {``None``, ``scipy.stats.qmc.QMCEngine``}
+        Quasi-Monte Carlo engine used for generating samples if ``qmc`` is True.
+
+        
     Examples
     --------
     
@@ -17,30 +142,30 @@ class LintSampler:
     cells (so 33 edges). 
     
     >>> cells = np.linspace(0, 10, 33)
-    >>> def pdfrandom(X): return np.random.uniform(size=X.shape[0])
-    >>> LintSampler(pdfrandom,cells).sample()
+    >>> def pdfrandom(X): return np.random.uniform()
+    >>> LintSampler(cells,pdf=pdfrandom).sample()
     6.984134639227398
 
     This returns a single scalar: the sampling point within the grid.
     
-    2. Multiple samples from a 1D grid (same grid as previous example).
+    2. Multiple samples from a 1D grid (same grid as previous example). Now
+    also demonstrating a vectorized pdf for efficiency when N becomes large.
     
     >>> cells = np.linspace(0, 10, 33)
     >>> def pdfrandom(X): return np.random.uniform(size=X.shape[0])
-    >>> LintSampler(pdfrandom,cells).sample(4)
+    >>> LintSampler(cells,pdf=pdfrandom,vectorizedpdf=True).sample(N=4)
     array([8.16447008, 5.30536088, 8.96135879, 7.73572977])
 
-    This returns a 1D array: the ``N_samples`` sampling points within the grid.
+    This returns a 1D array: the ``N`` sampling points within the grid.
 
     3. Single sample from a k-D grid. In this case we'll take a 2D grid, with
-    32 x 64 cells (so 33 gridlines along one axis and 65 along the other, and
-    33x65=2145 intersections with known densities).
+    32 x 64 cells (so 33 gridlines along one axis and 65 along the other).
     
     >>> x = np.linspace(0, 10, 33)
     >>> y = np.linspace(100, 200, 65)
     >>> cells = (x,y)
-    >>> def pdfrandom(X): return np.random.uniform(size=X.shape[0])
-    >>> LintSampler(pdfrandom,cells).sample()
+    >>> def pdfrandom(X): return np.random.uniform()
+    >>> LintSampler(cells,pdf=pdfrandom).sample()
     array([  7.67294632, 190.45302915])
 
     This returns a 1D array: the single k-D sampling point within the grid.
@@ -50,540 +175,344 @@ class LintSampler:
     >>> x = np.linspace(0, 10, 33)
     >>> y = np.linspace(100, 200, 65)
     >>> cells = (x,y)
-    >>> def pdfrandom(X): return np.random.uniform(size=X.shape[0])
-    >>> LintSampler(pdfrandom,cells).sample(5)
+    >>> def pdfrandom(X): return np.random.uniform()
+    >>> LintSampler(cells,pdf=pdfrandom).sample(N=5)
     array([[1.35963966e-01, 1.38182930e+02],
            [6.52704300e+00, 1.63109912e+02],
            [4.35226761e+00, 1.49753235e+02],
            [3.56093155e+00, 1.48548481e+02],
            [1.31163401e+00, 1.59335676e+02]])
 
-    This returns a 2D array, shape ``N_samples`` x k: the ``N_samples`` k-D
+    This returns a 2D array, shape (``N``, k): the ``N`` k-D
     samples within the grid.
+
+    5. A ``DensityGrid`` instance may also be passed to any of the above examples.
+    See the ``DensityGrid`` documentation for details. In this case, one need not
+    pass a pdf.
+
+    >>> x = np.linspace(0, 10, 33)
+    >>> y = np.linspace(100, 200, 65)
+    >>> def pdfrandom(X): return np.random.uniform()
+    >>> g = DensityGrid((x, y), pdfrandom)
+    >>> LintSampler(g).sample()
+    array([  1.417842  , 139.40070095])
+
     """
-
     def __init__(
-        self, pdf, cells,
-        seed=None, vectorizedpdf=False,
-        qmc=False, qmc_engine=None
+        self, domain,
+        pdf=None, vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
+        seed=None, qmc=False, qmc_engine=None
     ):
-        """Initialise a LintSampler instance.
-
-        Parameters
-        ----------
-        pdf : function
-            Probability density function from which to draw samples.
-
-        cells : single array, tuple of arrays or list of tuples of arrays
-            If a single array, the boundary values for a 1D grid. If a tuple of
-            arrays, the boundary values for a grid with dimensionality of the
-            length of the tuple. If a list of tuples of arrays, the boundary
-            values for an arbitrary number of grids with dimensionality the
-            length of the tuples.
-
-        seed : {None, int, ``numpy.random.Generator``}, optional
-            Seed for ``numpy`` random generator. Can be random generator itself,
-            in which case it is left unchanged. Can also be the seed to a
-            default generator. Default is None, in which case new default
-            generator is created. See ``numpy`` random generator docs for more
-            information.
-
-        vectorizedpdf : boolean
-            if True, assumes that the pdf passed is vectorized (i.e. can accept [...,k]-shaped arguments).
-            if False, assumes that the pdf passed accepts k arguments.
         
-        qmc : bool, optional
-            Whether to use Quasi-Monte Carlo sampling. Default is False.
-    
-        qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
-            QMC engine to use if qmc flag above is True. Should be subclass of
-            scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
-            first k dimensions are used for lintsampling, while last dimension is
-            used for cell choice (this happens even if only one cell is given).
-            Default is None. In that case, if qmc is True, then a scrambled Sobol
-            sequence is used.
+        # check given PDF is callable
+        if pdf:
+            if not callable(pdf):
+                raise TypeError(
+                    "LintSampler.__init__: " \
+                    f"Given PDF is not callable."
+                )
+        else:
+            if vectorizedpdf or pdf_args or pdf_kwargs:
+                warn(
+                    "LintSampler.__init__: " \
+                    f"PDF configuration setting given but no PDF provided."
+                )
 
-        Returns
-        -------
-        None
-
-
-        Attributes
-        ----------
-        pdf : function
-        seed : None, int, or ``numpy`` random Generator
-        vectorizedpdf : boolean
-
-        """
-
-        # set args as attributes
+        # set pdf-related parameters as attributes
         self.pdf = pdf
-        self.seed = seed
         self.vectorizedpdf = vectorizedpdf
+        self.pdf_args = pdf_args
+        self.pdf_kwargs = pdf_kwargs
 
-        # configure QMC according to given parameters
-        self._setqmc(qmc, qmc_engine)
+        # set up the sampling grids under the hood
+        self._set_grids(domain=domain)
 
-        # set up the sampling grid under the hood
-        self._setgrid(cells)
-    
-    def _setqmc(self, qmc, qmc_engine):
-        """Parse QMC-related parameters and set as attributes.
-        
-        Parameters
-        ----------
+        # configure random state according to given random seed and QMC params
+        self._set_random_state(seed, qmc, qmc_engine)
 
-        qmc : bool, optional
-            Whether to use Quasi-Monte Carlo sampling. Default is False.
-    
-        qmc_engine : {None, scipy.stats.qmc.QMCEngine}, optional
-            QMC engine to use if qmc flag above is True. Should be subclass of
-            scipy QMCEngine, e.g. qmc.Sobol. Should have dimensionality k+1, because
-            first k dimensions are used for lintsampling, while last dimension is
-            used for cell choice (this happens even if only one cell is given).
-            Default is None. In that case, if qmc is True, then a scrambled Sobol
-            sequence is used.
-
-        Returns
-        -------
-        None
-        
-        Attributes
-        ----------
-        qmc : boolean
-        qmc_engine : None or ``scipy`` QMCEngine
-
-        """
-        # warn if qmc engine provided but qmc off
-        if not qmc and qmc_engine is not None:
-            warnings.warn(
-                "LintSampler.__init__: " \
-                "provided qmc_engine won't be used as qmc switched off."
-            )
-    
-        # warn if qmc engine provided and RNG seed provided
-        if qmc_engine is not None and self.seed is not None:
-            warnings.warn(
-                "LintSampler.__init__: " \
-                "provided random seed won't be used as qmc_engine provided."
-            )
-        
-        # store qmc flag and engine as attributes
-        self.qmc = qmc
-        self.qmc_engine = qmc_engine
-        return
-
-    def _evaluate_gridded_pdf(self,funcargs=()):
-        """Evaluate the pdf on a grid, handling the flag for vectorized.
-        
-        Parameters
-        ------------
-        self : LintSampler
-            The LintSampler instance.
-
-        Returns
-        -----------
-        evalf: np.ndarray
-            The values of the pdf at the edge points of the grid.
-
-            
-        """
-        # tally the number of gridpoints
-        ngridpoints = np.prod(self.edgedims)
-
-        # create the flattened grid for evaluation in k>1 case
-        if self.dim > 1: 
-            edgegrid = np.stack(np.meshgrid(*self.edgearrays, indexing='ij'), axis=-1).reshape(np.prod(self.edgedims), self.dim)
-        else:
-            edgegrid = self.edgearrays[0]
-
-        # reshape the grid: assumes function takes same number of arguments as dimensions
-        if self.vectorizedpdf:
-            evalf = self.pdf(edgegrid,*funcargs).reshape(*self.edgedims)
-
-        else:
-            # iterate over the all gridpoints
-            evalf = np.zeros(ngridpoints)
-            for gridpoint in range(0,ngridpoints):
-                evalf[gridpoint] = self.pdf(edgegrid[gridpoint],*funcargs)
-            
-        # reshape back to grid
-        if self.dim > 1:
-            evalf = evalf.reshape(*self.edgedims)
-
-        return evalf
-    
-    def _evaluate_free_pdf(self,ngrid=None,funcargs=()):
-        """Evaluate the pdf for a set of cells, handling the flag for vectorized.
-
-        Parameters
-        ------------
-        self : LintSampler
-            The LintSampler instance.
-
-        Returns
-        -----------
-        evalfgrid: np.ndarray
-            The values of the pdf at the edge points of the grid.
-
-        """
-
-        # evaluate all points on the initial input grid and reshape
-        if self.vectorizedpdf:
-
-            if ngrid == None:
-                evalfgrid = self.pdf(self.edgearrays,*funcargs).reshape(self.gridshape[0:self.dim])
-            else:
-                evalfgrid = self.pdf(self.edgearrays[ngrid],*funcargs).reshape(self.gridshape[ngrid][0:self.dim])
-
-        else: # non-vectorised pdf
-            # flatten the arrays and pass to pdf
-            # tally the number of gridpoints
-            if ngrid == None:
-                ngridpoints = np.prod(self.edgedims)
-
-                # create the flattened grid for evaluation
-                edgegrid = np.stack(np.meshgrid(self.edgearrays, indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
-            else:
-                ngridpoints = self.ngridentries[ngrid]
-
-                # create the flattened grid for evaluation
-                edgegrid = np.stack(np.meshgrid((self.edgearrays[ngrid]), indexing='ij'), axis=-1).reshape(ngridpoints, self.dim)
-
-
-            # call the pdf
-            evalfgrid = np.zeros(ngridpoints)
-            for gridpoint in range(0,ngridpoints):
-                evalfgrid[gridpoint] = self.pdf(edgegrid[gridpoint],*funcargs)
-            
-            # reshape back to the grid
-            if ngrid == None:
-                evalfgrid = evalfgrid.reshape(self.gridshape[0:self.dim])
-            else:
-                evalfgrid = evalfgrid.reshape(self.gridshape[ngrid][0:self.dim])
-
-        return evalfgrid
-
-    def sample(self, N_samples=None, funcargs=()):
+    def sample(self, N=None):
         """Draw samples from the pdf on the constructed grid(s).
         
-        This function then draws a sample (or N samples) from the specified grid. It first chooses a cell 
-        (or N cells with replacement), weighting them by their mass (estimated by the trapezoid rule) 
-        then samples from k-linear interpolant within the chosen cell(s).
+        This function draws a sample (or ``N`` samples) from the given PDF over
+        the given grid(s). It first chooses a grid (or ``N`` grids with
+        replacement), weighting them by their total mass, then similarly chooses
+        a cell (or ``N`` cells), then samples from the k-linear interpolant
+        within the chosen cell(s).
         
         Parameters
         ----------
-        self : LintSampler
-            The LintSampler instance.
-        N_samples : {None, int}, optional
-            Number of samples to draw. Default is None, in which case a single
-            sample is drawn.
-        funcargs : optional
-            A tuple of optional arguments to be passed directly to the pdf function call.
+        N : {None, int}, optional
+            Number of samples to draw. Default is ``None``, in which case a
+            single sample is drawn.
 
         Returns
         -------
-        X : scalar, 1D array (length k OR N_samples) or 2D array (N_samples, k)
+        X : scalar, 1D array (length k OR ``N``) or 2D array (``N``, k)
             Sample(s) from linear interpolant. Scalar if single sample (i.e.,
-            N_samples is None) in 1D. 1D array if single sample in k-D OR multiple
-            samples in 1D. 2D array if multiple samples in k-D.
-        
+            ``N`` is None) in 1D. 1D array if single sample in k-D OR 
+            multiple samples in 1D. 2D array if multiple samples in k-D.
         
         """
-        
-        # check that the function can be evaluated at the passed-in points (i.e. needs to take the dimensions as an argument)
+        # check N sensible
+        if (N is not None):
+            if not isinstance(N, int):
+                raise TypeError(
+                    "LintSampler.sample: "\
+                    f"Expected int N, got {type(N)}"
+                )
+            elif N <= 0:
+                raise ValueError(
+                    "LintSampler.sample: "\
+                    f"Expected positive N, got {N}"
+                )
 
-        if self.eval_type == 'gridsample':
-
-            # evaluate the pdf
-            evalf = self._evaluate_gridded_pdf(funcargs)
-
-            # call the gridded sampler
-            X = _gridsample(*self.edgearrays,f=evalf,N_samples=N_samples,seed=self.seed,qmc=self.qmc,qmc_engine=self.qmc_engine)
-
-            return X
-
-
-        elif self.eval_type == 'freesample':
-
-            if self.dim == 1:
-
-                # pdf call needs to be 1d, so rearrange
-                corners = (np.array([self.pdf(x[0],*funcargs) for x in self.x0]),np.array([self.pdf(x[0]) for x in self.x1]))
-
-            else:
-
-                # get all combinations of starting and ending corner points (only depends on dimension)
-                combinations = self._get_startend_points()
-
-                # loop through the grids
-                evalfgrid = []
-                allcorners = []
-                for ngrid in range(0,self.ngrids):
-                    allcorners.append([]) # make a list of lists, to later concatenate
-
-                    tmpevalfgrid = self._evaluate_free_pdf(ngrid,funcargs)
-                    
-                    # assign to list
-                    evalfgrid.append(tmpevalfgrid)
-
-
-                    for combo in combinations: 
-
-                        arrslice = []
-                        for griddim,entry in enumerate(combo):
-
-                            if entry==0:
-                                arrslice.append(slice(0,self.gridshape[ngrid][griddim]-1))
-
-                            else: # must be a 1
-                                arrslice.append(slice(1,self.gridshape[ngrid][griddim]))
-
-                        allcorners[ngrid].append(evalfgrid[ngrid][tuple(arrslice)].flatten())
-
-                # now go back through and remake the corners to stack everything up
-                corners = []
-                for ncombo in range(0,len(combinations)):
-                    corners.append(np.hstack([allcorners[ngrid][ncombo] for ngrid in range(0,self.ngrids)]))
-
-
-            # do the sampling
-            X = _freesample(self.x0,self.x1,*corners,N_samples=N_samples,seed=self.seed,qmc=self.qmc,qmc_engine=self.qmc_engine)
-
-            return X
-
-
+        # generate uniform samples (N, k+1) if N, else (1, k+1)
+        # first k dims used for lintsampling, last dim used for cell choice
+        if N:
+            u = self._generate_usamples(N)
         else:
-            raise ValueError(f"LintSampler.sample: eval_type is expected to be either gridsample or freesample.")
+            u = self._generate_usamples(1)
+        
+        # if single grid, gridsample on it
+        if self.ngrids == 1:
+            X = _grid_sample(self.grids[0], u)
 
-        pass
+        # if multiple grids, choose grids and rescale usamples for cell choice
+        else:
+            # get list of grid masses
+            grid_masses = np.array([g.total_mass for g in self.grids])
+            
+            # normalise to probability array, 1D array len self.ngrids
+            p = grid_masses / grid_masses.sum()
 
+            # choose grids:
+            # grid_choice is 1D array of grid indices, length N            
+            grid_choice = _choice(p, u[:, -1])
 
-    def resetgrid(self,cells=()):
-        """Reset the sample grid without changing the pdf.
+            # cdf is 1D array giving CDF over grids, length self.ngrids + 1
+            cdf = np.append(0, p.cumsum())
+            
+            # extremes of CDF intervals (each len self.ngrids)
+            starts = cdf[:-1]
+            ends = cdf[1:]
+            
+            # loop over grids:
+            # gridsample at each grid, rescaling usamples by CDF interval size
+            X = np.empty((0, self.dim))
+            for i in range(self.ngrids):
+                m = grid_choice == i
+                if m.any():
+                    usub = u[grid_choice == i]
+                    usub[:, -1] = (usub[:, -1] - starts[i]) / (ends[i] - starts[i])
+                    X = np.vstack((X, _grid_sample(self.grids[i], usub)))
+
+        # final shuffle (important if using QMC with multiple grids)
+        if N:
+            self.rng.shuffle(X, axis=0)
+
+        # squeeze down to scalar / 1D if appropriate
+        if not N and (self.dim == 1):
+            X = X.item()
+        elif not N:
+            X = X[0]
+        elif (self.dim == 1):
+            X = X.squeeze()
+
+        return X
+
+    def reset_domain(self, domain):
+        """Reset the sampling grid(s) without changing the pdf.
         
         Parameters
         ----------
-        self : LintSampler
-            The LintSampler instance.
-
+        domain : iterable or `DensityGrid`
+            See ``domain`` entry in documentation for class constructor.
+        
         Returns
         -------
-        combinations: numpy array
-            All possible combinations of starting and ending points for the
-            inferred dimensionality of the problem.
-                
+        None
         """
-        self._setgrid(cells)
+        # reset grid(s)
+        self._set_grids(domain=domain)
 
 
-    def _setgrid(self,cells):
-        """Construct the cells for sampling.
+    def _set_grids(self, domain):
+        """Configure the grid(s) for sampling.
 
         Parameters
         ----------
-        self : LintSampler
-            The LintSampler instance.
-        cells : single array, tuple of arrays or list of tuples of arrays
-            If a single array, the boundary values for a 1D grid. If a tuple of arrays, the
-            boundary values for a grid with dimensionality of the length of the tuple. If
-            a list of tuples of arrays, the boundary values for an arbitrary number of
-            grids with dimensionality the length of the tuples.
+        domain : iterable or `DensityGrid`
+            See ``domain`` entry in documentation for class constructor.
 
         Returns
         -------
         None
-        
-        Attributes
-        -------
-        eval_type : string
-            The evaluation type, either 'gridsample' or 'freesample'
-        dim : int
-            The inferred dimensionality of the problem
-        edgearrays : list of numpy arrays
-            The arrays defining the edge of the grids
-        edgedims   : tuple of integers, optional, used if eval_type == 'gridsample'
-            The shape of the gridsample grid
-        ngrids : integer, optional, used if eval_type == 'freesample'
-            The number of distinct grids to be constructed
-        gridshape : list of tuple of integers, optional, used if eval_type == 'freesample'
-            The shape of each distinct grid
-        ngridentries : list of integers, optional, used if eval_type == 'freesample'
-            The number of entries in the 
-        nedgegridentries : list of integers, optional, used if eval_type == 'freesample'
-            The number of entries in the offset grids
-        x0 : list of numpy arrays, optional, used if eval_type == 'freesample'
-            The array of the first vertex of the grids
-        x1 : list of numpy arrays, optional, used if eval_type == 'freesample'
-            The array of the last vertex of the grids
-
-        
         """
+        # domain cases:
+        # - domain is a single pre-made density grid
+        # - domain is a list of ditto
+        # - domain is a list of: 1D iterables or tuples of 1D iterables
+        # - domain is a single 1D iterable / tuple of 1D iterables
+        if isinstance(domain, DensityStructure):
+            self.ngrids = 1
+            self.grids = [domain]
+            if self.pdf:
+                warn(
+                        "LintSampler.__set_grids: " \
+                        "Pre-constructed DensityStructure provided, so `pdf` "\
+                        "parameter is redundant."
+                    )
+        elif isinstance(domain, list) and _all_are_instances(domain, DensityStructure):
+            self.ngrids = len(domain)
+            self.grids = domain
+            # check all list items are same sort of thing
+            if not _all_are_instances(domain, type(domain[0])):
+                raise TypeError(
+                    "LintSampler._set_grids: "\
+                    f"List members of different types"
+                )
+            if self.pdf:
+                warn(
+                        "LintSampler.__set_grids: " \
+                        "Pre-constructed DensityStructure provided, so `pdf` "\
+                        "parameter is redundant."
+                    )
+        elif isinstance(domain, list) and not _is_1D_iterable(domain):
+            # check PDF provided
+            if not self.pdf:
+                raise ValueError(
+                    "LintSampler._set_grids: "\
+                    f"No PDF provided and no pre-constructed DensityStructure."
+                )
+            # check all list items are same sort of thing
+            if not _all_are_instances(domain, type(domain[0])):
+                raise TypeError(
+                    "LintSampler._set_grids: "\
+                    f"List members of different types"
+                )
+            self.ngrids = len(domain)
+            gargs = dict(
+                pdf=self.pdf, vectorizedpdf=self.vectorizedpdf,
+                pdf_args=self.pdf_args, pdf_kwargs=self.pdf_kwargs
+            )
+            self.grids = [DensityGrid(edges=ci, **gargs) for ci in domain]
+        else:
+            # check PDF provided
+            if not self.pdf:
+                raise ValueError(
+                    "LintSampler._set_grids: "\
+                    f"No PDF provided and no pre-constructed DensityStructure."
+                )
+            self.ngrids = 1
+            self.grids = [
+                DensityGrid(edges=domain, pdf=self.pdf, vectorizedpdf=self.vectorizedpdf,
+                            pdf_args=self.pdf_args, pdf_kwargs=self.pdf_kwargs)
+            ]
 
-        # check the validity of the input
-        if len(cells)==0:
-            raise ValueError(f"LintSampler._setgrid: you must specify an evaluation domain with a single array, a tuple of arrays or a list of tuples of arrays. See documentation for details.")
-            # or, we could here drop into an adaptive grid selection
-            # or, we could sample on a unit hypercube with dimensions of the pdf
+        # get dimensionality of problem from first grid
+        self.dim = self.grids[0].dim
 
-        # 0. are we in the 1d case? the input is just a single tuple or 1d array.
-        # i.e. cells = np.linspace(-12,12,100)
-        if hasattr(cells, "__len__") and not hasattr(cells[0], "__len__"):
-            self.eval_type='gridsample'
+        # check that all grids have same dimension 
+        for grid in self.grids[1:]:
+            if grid.dim != self.dim:
+                d1 = grid.dim
+                d2 = self.dim
+                raise ValueError(
+                    "LintSampler._set_grids: "\
+                    f"Grids have mismatched dimensions: {d1} and {d2}"
+                )
+    
+        # loop over grid pairs and check no overlap
+        for i in range(self.ngrids - 1):
+            for j in range(i + 1, self.ngrids):
+                overlap = _check_hyperbox_overlap(
+                    self.grids[i].mins, self.grids[i].maxs,
+                    self.grids[j].mins, self.grids[j].maxs,
+                )
+                if overlap:
+                    raise ValueError(
+                        "LintSampler._set_grids: " \
+                        f"Grids {i} and {j} spatially overlapping."
+                    )
 
-            # override the inferred dimensionality
-            self.dim = 1
-
-            # set the arrays
-            # we are being passed the array directly
-            self.edgearrays = [np.array(cells)]
-            self.edgedims = (len(cells),)
-
-
-        # 1. tuples defining the array -> make arrays, pass to gridsample
-        # i.e. cells = (np.linspace(-12,12,100),np.linspace(-4,4,50))
-        elif isinstance(cells,tuple):
-
-            if not (hasattr(cells[0], "__len__") and not hasattr(cells[0][0], "__len__")):
-                raise TypeError(f"LintSampler._setgrid: Cells must be a single tuple of 1D sequences (arrays, lists, or tuples).")
-            
-            # infer the dimensionality
-            self.dim = len(cells)
-
-            # set the evaluation type
-            self.eval_type = 'gridsample'
-
-            # keep track of the edge arrays
-            self.edgearrays = []
-
-            # keep track of the dimensions
-            self.edgedims = ()
-
-            # create the grid
-            for d in range(0,self.dim):
-                self.edgearrays.append(np.array(cells[d]))
-                self.edgedims += (len(cells[d]),)
-
-        # 1b. We have been passed the grid already, and need to dissasemble it for _gridsample
-        elif isinstance(cells,np.ndarray): # this will not catch 1d, because we have already caught that
-
-            # set the evaluation type
-            self.eval_type = 'gridsample'
-
-            # infer the dimensionality
-            self.dim = cells.shape[-1]
-
-            # keep track of the extent in each dimension
-            self.edgedims = cells.shape[0:self.dim]
-
-            # keep track of the edgearrays
-            self.edgearrays = []
-            for d in range(0,self.dim):
-                # get the unique values in each dimension stack
-                index = [0]*(self.dim+1)
-                index[d] = slice(None)
-                index[-1] = d
-                self.edgearrays.append(cells[tuple(index)])
-
-
-        # 2. a list of tuples defining multiple arrays
-        # i.e. cells = [(np.linspace(-12,0,100),np.linspace(-4,0,50)),(np.linspace(0,12,100),np.linspace(0,4,50))]
-        # or in 1d case, a list of un-linked grids
-        # i.e. cells = [np.linspace(-12,0,100),np.linspace(2,12,100)]
-        # or a list of grids that have been preconstructed and stacked,
-        # i.e. [np.stack(np.meshgrid(np.linspace(-12,0,100),np.linspace(-4,0,50), indexing='ij'), axis=-1),np.stack(np.meshgrid(np.linspace(0,12,100),np.linspace(0,4,50), indexing='ij'), axis=-1)]
-        elif isinstance(cells,list):
-            self.eval_type = 'freesample'
-
-            # variable controlling whether grids have already been constructed or not
-            _gridsconstructed = False
-
-            # how many grid boundaries are we being handed?
-            self.ngrids = len(cells)
-
-            # infer dimensionality
-            # cells = list of tuples of 1D iterables
-            if isinstance(cells[0], tuple) and hasattr(cells[0][0], "__len__"):
-                self.dim = len(cells[0])
-            # cells = list of (k+1)-d grids (i.e. preconstructed k-d grids)
-            elif isinstance(cells[0], np.ndarray) and cells[0].ndim > 1:
-                _gridsconstructed = True
-                self.dim = cells[0].shape[-1]
-            # cells = list of 1d iterables
-            elif hasattr(cells[0], "__len__") and not hasattr(cells[0][0], "__len__"):
-                self.dim = 1
-            else:
-                raise ValueError(f"LintSampler._setgrid: Input cells do not make sense.")
-
-            # create holding arrays
-            grids                 = [] # the grids constructed from the inputs (no need to expose)
-            self.gridshape        = [] # the shape of the input grids
-            self.ngridentries     = [] # the number of entries in the grid
-            self.nedgegridentries = [] # the number of entries in the edge grid
-            self.edgearrays       = [] # the flattened grids, each [ngridentries,dim]
-
-            # loop through the boundaries, construct the grids, and flatten
-            for ngrid in range(0,self.ngrids):
-               
-                if _gridsconstructed:
-                    # check that the grid has the same dimensionality as the others
-                    if ((self.dim>1) & (cells[ngrid].shape[-1]!=self.dim)):
-                        raise ValueError(f"LintSampler._setgrid: All input grids must have the same dimensionality.")
-                    
-                    grid = cells[ngrid]
-
-                else:
-                    # check that the dimensions are properly specified for the grid
-                    if self.dim > 1 and len(cells[ngrid])!=self.dim:
-                        raise ValueError(f"LintSampler._setgrid: All input cells must have the same dimensionality.")
-
-                    # construct the grid
-                    if self.dim > 1:
-                        grid = np.stack(np.meshgrid(*cells[ngrid], indexing='ij'), axis=-1)
-                    else:
-                        grid = np.array(cells[ngrid])
-
-                # save the grid
-                grids.append(grid)
-
-                # construct the grid boundary helpers
-                self.gridshape.append(grid.shape)
-                self.ngridentries.append(np.prod(grid.shape[0:self.dim]))
-                self.nedgegridentries.append(np.prod(np.array(grid.shape[0:self.dim])-1))
-
-                # flatten the grid into a [...,dim] array for passing to pdf
-                self.edgearrays.append(grid.reshape(self.ngridentries[ngrid],self.dim))
-            
-            self.x0 = np.vstack([grids[ngrid][tuple([slice(0,self.gridshape[ngrid][griddim]-1) for griddim in range(0,self.dim)])].reshape((self.nedgegridentries[ngrid],self.dim)) for ngrid in range(0,self.ngrids)])
-            self.x1 = np.vstack([grids[ngrid][tuple([slice(1,self.gridshape[ngrid][griddim]  ) for griddim in range(0,self.dim)])].reshape((self.nedgegridentries[ngrid],self.dim)) for ngrid in range(0,self.ngrids)])
-
-
-    def _get_startend_points(self):
-        """Return all combinations of start and end points for offset grids.
+    def _set_random_state(self, seed, qmc, qmc_engine):
+        """Configure random number generators and set as attributes.
         
         Parameters
-        ----------
-        self : LintSampler
-            The LintSampler instance.
+        ----------        
+        seed : {``None``, int, ``numpy.random.Generator``}
+            See documentation for ``seed`` in class constructor.
+        qmc : bool
+            See documentation for ``qmc`` in class constructor.    
+        qmc_engine : {``None``, ``scipy.stats.qmc.QMCEngine``}
+            See documentation for ``qmc_engine`` in class constructor.
 
         Returns
         -------
-        combinations: numpy array
-            All possible combinations of starting and ending points for the
-            inferred dimensionality of the problem.
-        
+        None
         """
+        # store QMC flag as attribute
+        self.qmc = qmc
 
-        # Create an array representing the start/end points
-        arr = np.array([0, 1]) 
+        # set up numpy RNG; store as attribute
+        self.rng = np.random.default_rng(seed)
+        
+        # if using quasi-MC, configure qmc engine
+        if self.qmc:
+            
+            # default: scrambled Sobol
+            if qmc_engine is None:
+                qmc_engine = Sobol(d=self.dim + 1, bits=32, seed=seed)
+            
+            # user-provided QMC engine
+            elif isinstance(qmc_engine, QMCEngine):
+                
+                # check dimension appropriate
+                if qmc_engine.d != self.dim + 1:
+                    raise ValueError(
+                        "LintSampler.__init__: " \
+                        f"qmc_engine inconsistent: expected {self.dim + 1}."
+                    )
+                
+                # warn if qmc engine provided and RNG seed provided
+                if seed is not None:
+                    warn(
+                        "LintSampler.__init__: " \
+                        "pre-condigured qmc_engine provided, so given random "\
+                        "seed won't be used except for final array shuffle."
+                    )
 
-        # get all combinations
-        combinations = np.array(np.meshgrid(*[arr]*self.dim)).T.reshape(-1,self.dim)
+            # QMC engine type not recognized
+            else:
+                raise TypeError("qmc_engine must be QMCEngine instance or None")
 
-        # Rearrange the combinations
-        sorted_combinations = np.lexsort(combinations.T[::-1])
+        # if qmc engine provided but QMC flag off, warn
+        else:
+            if qmc_engine is not None:
+                warn(
+                    "LintSampler.__init__: " \
+                    "provided qmc_engine won't be used as qmc switched off."
+                )
 
-        # Reorder the combinations
-        combinations = combinations[sorted_combinations]
+        # set attribute
+        self.qmc_engine = qmc_engine
 
-        return combinations
+    def _generate_usamples(self, N):
+        """Generate array of uniform samples ~U(0,1).
+        
+        Parameters
+        ----------        
+        N : int
+            Number of uniform samples to draw.
+        
+        Returns
+        -------
+        u : array
+            2D array of uniform samples shaped (``N``, ``dim``+1), where ``dim``
+            is dimensionality of grid (``self.dim`` attribute).
+        """
+        if self.qmc:
+            u = self.qmc_engine.random(N)
+        else:
+            u = self.rng.random((N, self.dim + 1))
+        return u

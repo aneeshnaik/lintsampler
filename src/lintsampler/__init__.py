@@ -1,9 +1,16 @@
+"""
+lintsampler
+
+Efficient random sampling via linear interpolation.
+
+See README file and online documentation (https://lintsampler.readthedocs.io)
+for further details and usage instructions. 
+"""
 from .lintsampler import LintSampler
-from importlib.metadata import version, PackageNotFoundError
+from .density_structures.base import DensityStructure
+from .density_structures.grid import DensityGrid
+from .density_structures.tree import DensityTree
+from importlib.metadata import version
 
-try:
-    __version__ = version("lintsampler")
-except PackageNotFoundError:
-    __version__ = "unknown version"
-
-__all__ = ["LintSampler"]
+__version__ = version("lintsampler")
+__all__ = ["LintSampler", "DensityStructure", "DensityGrid", "DensityTree"]

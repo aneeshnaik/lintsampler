@@ -4,4 +4,5 @@ The main purpose of `lintsampler` is drawing samples from a $k$-dimensional dens
 
 A note about the density: `lintsampler`'s algorithm does not require that $f(\mathbf{x})$ be a properly normalised probability density; it is sufficient to specify the density function up to a normalising constant. Throughout the rest of this Theory section of the documentation, we use the symbol $f$ to denote an unnormalised density function, and $p$ to denote a true PDF.
 
-The [next section](./inverse_sampling) describes how inverse transform sampling works in general, then the [section after that](./linear_interpolant) describes the linear interpolant sampling algorithm. It concludes with a self-contained summary, so a reader in a hurry can skip there. The [section after that](./worked_example.md) gives a worked example.
+The [next section](./inverse_sampling) describes how inverse transform sampling works in general, then the [section after that](./linear_interpolant) describes the linear interpolant sampling algorithm. It concludes with a self-contained summary, so a reader in a hurry can [skip there](./linear_interpolant.md#summary). The [final section](./worked_example.md) gives a worked example.
+
