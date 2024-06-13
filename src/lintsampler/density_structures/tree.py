@@ -8,16 +8,29 @@ from ..utils import _choice, _get_hypercube_corners, _get_grid_origin_from_cell_
 class DensityTree(DensityStructure):
     """Tree-like object over which density function is evaluated.
 
-    #TODO extended description
+    ``DensityTree`` uses the parameters ``mins`` and ``maxes`` to construct the
+    k-dimensional root cell of the tree, evaluating densities on the 2^k corners
+    of the cell with the given ``pdf`` function. If ``min_openings`` is
+    non-zero, then the root is opened into a series of children, and the
+    children are successively opened, each time with the ``pdf`` function being
+    evaluated on the corners. After construction, the ``refine_by_error`` method
+    can be used to further open the tree. During all of these cell openings,
+    the tree uses a cache to ensure that a density evaluated on a parent is
+    not re-evaluated on a child (although this functionality can be turned off
+    with the ``usecache`` flag).
+
+    See the examples below for the various usage patterns.
     
     Parameters
     ----------
-    mins : 1D array-like
+    mins : scalar or 1D iterable
         For k-dimensional structure, length-k array giving coordinate minima
-        along all axes (e.g., bottom-left corner in 2D).
-    maxs : 1D array-like
+        along all axes (e.g., bottom-left corner in 2D). In one dimension, can
+        simply provide single number.
+    maxs : scalar or 1D iterable
         For k-dimensional structure, length-k array giving coordinate maxima
-        along all axes (e.g., top-right corner in 2D).
+        along all axes (e.g., top-right corner in 2D). In one dimension, can
+        simply provide single number.
     pdf : function
         Probability density function to evaluate on grid. Function should
         take coordinate vector (or batch of vectors if vectorized; see
@@ -40,8 +53,20 @@ class DensityTree(DensityStructure):
         (no additional keyword arguments).
     min_openings : int, optional
         Number of full tree openings to perform on initialisation. This is
-        distinct from any further openings that happen on calling a refinement
-        method.
+        distinct from any further openings that happen on refining. Default is
+        0.
+    usecache : bool, optional
+        Whether to use the cache to store density evaluations, so that densities
+        evaluated on a parent are not later re-evaluated on a child. It is
+        generally recommended to use this, unless a PDF function is so fast that
+        that re-evaluations are cheaper than cache lookups. The cache is
+        not used if ``batch=True`` (see below). Default is True.
+    batch : bool, optional
+        When creating the 2^k child cells of a given parent cell, whether to
+        evaluate their various vertex densities in a single batch. This is
+        incompatible with the density cache, so is switched off by default.
+        However, there might be circumstances where ``batch=True`` plus
+        ``usecache=False`` is faster than vice versa. Default is False.
 
     Attributes
     ----------
@@ -61,7 +86,11 @@ class DensityTree(DensityStructure):
         Root cell of tree.
     leaves : list
         List of ``TreeCell`` instances representing leaves of tree.
-    
+    usecache : bool
+        See corresponding parameter in constructor.
+    batch : bool
+        See corresponding parameter in constructor.
+
     Examples
     --------
     #TODO
