@@ -3,8 +3,8 @@ import sys
 sys.path.insert(0, os.path.abspath('../../src'))
 
 project = 'lintsampler'
-copyright = '2024, Aneesh Naik'
-author = 'Aneesh Naik'
+copyright = '2024, lintsampler maintainers'
+author = 'Aneesh Naik and Michael Petersen'
 extensions = ['sphinx.ext.autodoc', 'numpydoc', 'myst_nb']
 templates_path = ['_templates']
 exclude_patterns = []
