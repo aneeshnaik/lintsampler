@@ -140,7 +140,7 @@ def test_num_leaves(dim, batch):
     (2, [3, 5.5])
 ])
 def test_get_leaf_bad_pos(dim, pos):
-    """Test leaf returned by get_leaf_at_pos method contains given pos"""
+    """Test error raised if get_leaf_at_pos method gets weird or external pos"""
     if dim == 1:
         mins = -10
         maxs = 10
@@ -156,7 +156,7 @@ def test_get_leaf_bad_pos(dim, pos):
 
 @pytest.mark.parametrize("dim", [1, 2])
 def test_get_leaf_gets_correct_leaf(dim):
-    """Test error raised if get_leaf_at_pos method gets weird or external pos"""
+    """Test leaf returned by get_leaf_at_pos method contains given pos"""
     if dim == 1:
         mins = -10
         maxs = 10
@@ -179,14 +179,14 @@ def test_refinement_without_opening():
     """Test refinement fails if min_openings=0"""
     tree = DensityTree(mins=-5, maxs=5, pdf=norm.pdf, min_openings=0)
     with pytest.raises(RuntimeError):
-        tree.refine_by_error(1e-1)
+        tree.refine(1e-1)
 
 
 @pytest.mark.parametrize("verbose", [True, False])
 def test_verbose_refinement(capfd, verbose):
     """Test print statements with verbose mode on/off"""
     tree = DensityTree(mins=-5, maxs=5, pdf=norm.pdf, min_openings=1)
-    tree.refine_by_error(1e-1, verbose=verbose)
+    tree.refine(1e-1, verbose=verbose)
     out, err = capfd.readouterr()
     if verbose:
         assert out[:8] == "Pre-loop"

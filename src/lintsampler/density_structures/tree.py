@@ -13,7 +13,7 @@ class DensityTree(DensityStructure):
     of the cell with the given ``pdf`` function. If ``min_openings`` is
     non-zero, then the root is opened into a series of children, and the
     children are successively opened, each time with the ``pdf`` function being
-    evaluated on the corners. After construction, the ``refine_by_error`` method
+    evaluated on the corners. After construction, the ``refine`` method
     can be used to further open the tree. During all of these cell openings,
     the tree uses a cache to ensure that a density evaluated on a parent is
     not re-evaluated on a child (although this functionality can be turned off
@@ -54,7 +54,7 @@ class DensityTree(DensityStructure):
     min_openings : int, optional
         Number of full tree openings to perform on initialisation. This is
         distinct from any further openings that happen on refining. Default is
-        0.
+        1.
     usecache : bool, optional
         Whether to use the cache to store density evaluations, so that densities
         evaluated on a parent are not later re-evaluated on a child. It is
@@ -93,12 +93,142 @@ class DensityTree(DensityStructure):
 
     Examples
     --------
-    #TODO
+    
+    These examples demonstrate the various ways to set up and use an instance
+    of ``DensityTree``.
+    
+    - A basic tree in 1D
+    
+      In the simplest case, we only need three parameters to construct a tree:
+      the minimum coordinate bound(s), the maximum coordinate bound(s), and the
+      pdf function to evaluate on the tree. In the 1D case, we can just use
+      single numbers for the coordinate bounds, and in this example we'll
+      use the ``scipy`` implementation of the standard normal distribution for
+      the PDF.
+      
+      >>> from scipy.stats import norm
+      >>> tree = DensityTree(-10, 10, pdf=norm.pdf)
+      
+      This sets up a one-dimensional tree, bounded by [-10, 10]. Let's
+      interrogate some of the attributes describing the geometry of the tree:
+      
+      >>> tree.mins
+      array([-10])
+      >>> tree.maxs
+      array([10])
+      >>> tree.dim
+      1
+      
+      ``mins`` and ``maxs`` are the same as the input parameters, but cast to
+      arrays. ``dim`` is an integer describing the dimensionality of the space.
+
+      The attribute `root` gives a reference to the root cell of the tree:
+      
+      >>> tree.root
+      <lintsampler.density_structures.tree._TreeCell at 0x7fd1b2b34740>
+      
+      This is an instance of the private _TreeCell class.
+      
+      By default, ``min_openings`` is 1, so the root cell will be opened into
+      (in one dimension) 2 children. These can be accessed via the ``leaves``
+      attribute:
+      
+      >>> tree.leaves
+      [<lintsampler.density_structures.tree._TreeCell at 0x7fc6f2d6f560>,
+       <lintsampler.density_structures.tree._TreeCell at 0x7fc6f3cbf320>]
+
+      We can get the total probability mass of the tree via the ``total_mass``
+      attribute:
+      
+      >>> tree.total_mass
+      3.989422804014327
+      
+      Because we're using a properly normalised Gaussian PDF, this should 
+      actually be unity. However, our estimate of the integral is quite bad
+      because we are essentially using the trapezoid approximation to the
+      integral with only two trapezoids.
+    
+    - 1D tree with more full openings
+    
+      In the example above, we saw that the tree was not able to give a good
+      approximation for the integral under the normal distribution with only
+      two leaves, because the resolution is too low. One way to improve this
+      is to increase the ``min_openings`` parameter, which sets how many
+      times the initial root cell is opened. 
+      
+      >>> from scipy.stats import norm
+      >>> tree = DensityTree(-10, 10, pdf=norm.pdf, min_openings=3)
+      >>> len(tree.leaves)
+      8
+      >>> tree.total_mass
+      1.0850046370702153
+      
+      Now, we have done 3 full openings, giving us 2^3=8 leaves. As a
+      consequence, the estimate of the total probability mass is greatly
+      improved.
+      
+    - 3D tree
+    
+      We can go beyond one dimension by providing ``mins`` and ``maxs``
+      parameters which are iterables rather than scalars. For the PDF here, we
+      can use the multivariate normal implementation in `scipy`:
+      
+      >>> from scipy.stats import multivariate_normal
+      >>> pdf = multivariate_normal(np.zeros(3), np.eye(3)).pdf
+      >>> tree = DensityTree([10, 100, 1000], [20, 200, 2000], pdf=pdf)
+      >>> tree.dim
+      3
+      
+    - Refinement
+    
+      As well as ``min_openings``, another way to increase the resolution of the
+      tree is the ``refine`` method. Instead of opening all the leaves in the
+      tree, this uses a Romberg integration method to try to find the leaves
+      which would be most helpful to open (i.e., some combination of the most
+      massive and most erroneous leaves). The only required parameter of
+      ``refine`` is ``tree_tol``: a fractional tolerance level, which can be
+      roughly understood as the tolerance level on the total mass error of the
+      tree. See the docstring of that method for more details about its various
+      parameter options and settings.
+      
+      >>> from scipy.stats import norm
+      >>> tree = DensityTree(-10, 10, pdf=norm.pdf)
+      >>> tree.refine(1e-3)
+      >>> tree.total_mass
+      1.0020293093918315
+    
+    - Vectorized PDF calls
+    
+      By default, it is assumed that the PDF function takes single k-vectors and
+      returns scalar densities. However, if a PDF function is vectorized such
+      that it takes a batch of positions shaped (N, k) and returns a batch of
+      densities shaped (N,) then we can let ``DensityTree`` know via the
+      ``vectorizedpdf`` flag, which will hopefully speed up tree construction
+      and refinement.
+      
+      As it happens, the ``scipy`` PDF functions we were using above are all
+      vectorized, so:
+      
+      >>> DensityTree(-10, 10, pdf=norm.pdf, vectorizedpdf=True)
+
+    - ``get_leaf_at_pos``
+    
+      The method ``get_leaf_at_pos`` is a useful method which can find the leaf
+      on the tree that contains a given position.
+      
+      >>> from scipy.stats import multivariate_normal
+      >>> pdf = multivariate_normal(mean=np.ones(2), cov=np.eye(2)).pdf
+      >>> tree = DensityTree([-5, -5], [5, 5], pdf=pdf, vectorizedpdf=True)
+      >>> tree.refine(1e-2)
+      >>> tree.get_leaf_at_pos(np.array([1.02, -3.74]))
+      <lintsampler.density_structures.tree._TreeCell at 0x7f9003228680>
+      
+      This returns a reference to the relevant leaf.
     """
     def __init__(
         self, mins, maxs, pdf,
         vectorizedpdf=False, pdf_args=(), pdf_kwargs={},
-        min_openings=0, usecache=True, batch=False
+        min_openings=1, usecache=True, batch=False
     ):
         # cast to arrays
         if not hasattr(mins, "__len__"):
@@ -224,7 +354,7 @@ class DensityTree(DensityStructure):
 
         return mins, maxs, corners
 
-    def refine_by_error(self, tree_tol, leaf_tol=0.01, leaf_mass_contribution_tol=0.01, verbose=False):
+    def refine(self, tree_tol, leaf_tol=0.01, leaf_mass_contribution_tol=0.01, verbose=False):
         """Refine the tree by opening leaves with large estimated mass errors.
 
         Refinement uses a strategy based on Romberg integration, and happens
@@ -672,7 +802,7 @@ class _GridCache:
             densities = np.zeros(len(corners), dtype=np.float64)
             for i, corner in enumerate(corners):
                 f = self._retrieve_from_cache(corner, level)
-                if f:
+                if f is not None:
                     m_cached[i] = True
                     densities[i] = f
             
@@ -789,7 +919,9 @@ class _GridCache:
         corner = tuple(corner)
 
         # except on root, can't be even vertex (would've been cached on parent)
-        assert not (level != 0 and all(x % 2 == 0 for x in corner))
+        msg = "_GridCache._cache: "\
+              f"Corner {corner} on level {level} should've cached on parent"
+        assert not (level != 0 and all(x % 2 == 0 for x in corner)), msg
         
         # add to cache
         if level not in self._levelcaches:

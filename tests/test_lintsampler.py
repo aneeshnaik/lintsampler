@@ -590,7 +590,7 @@ def test_1D_gaussian_tree(min_openings, refine, tree_tol):
 
     tree = DensityTree(mins=np.array([-10]), maxs=np.array([10]), pdf=d.pdf, vectorizedpdf=True, min_openings=min_openings)
     if refine:
-        tree.refine_by_error(tree_tol=tree_tol)
+        tree.refine(tree_tol=tree_tol)
 
     sampler = LintSampler(domain=tree)
     x = sampler.sample(N=2**17)
@@ -648,7 +648,7 @@ def test_kD_gaussian_tree(min_openings, refine, tree_tol):
         min_openings=min_openings
     )
     if refine:
-        tree.refine_by_error(tree_tol=tree_tol)
+        tree.refine(tree_tol=tree_tol)
     sampler = LintSampler(domain=tree)
     x = sampler.sample(N=2**18)
 
