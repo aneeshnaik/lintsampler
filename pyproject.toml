@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "lintsampler"
 authors = [
   { name="Aneesh P. Naik", email="aneesh.naik@roe.ac.uk" },
+  { name="Michael S. Petersen", email="michael.petersen@roe.ac.uk" },
 ]
 description = "Efficient random sampling via linear interpolation."
 readme = "README.md"
