@@ -2,7 +2,7 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - sphinx
+  - sphinx=7.2
   - sphinx-book-theme
   - numpy
   - numpydoc
