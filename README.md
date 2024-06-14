@@ -1,5 +1,5 @@
 # lintsampler
-![Animation showing 'lintsampler' rendered in points.](docs/source/assets/lintsampler.gif)
+![Animation showing 'lintsampler' rendered in points.](docs/source/_static/lintsampler.gif)
 
 **Efficient random sampling via linear interpolation.**
 
