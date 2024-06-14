@@ -25,7 +25,7 @@ bibliography: paper.bib
 
 # Summary
 
-`lintsampler` provides a Python implementation of a technique we term 'linear interpolant sampling': an algorithm to efficiently draw pseudo-random samples from an arbitrary PDF. First, the PDF is evaluated on a grid-like structure. Then, it is assumed that the PDF can be approximated between grid vertices by the (multidimensional) linear interpolant. With this assumption, random samples can be efficiently drawn via inverse transform sampling. 
+`lintsampler` provides a Python implementation of a technique we term 'linear interpolant sampling': an algorithm to efficiently draw pseudo-random samples from an arbitrary PDF. First, the PDF is evaluated on a grid-like structure. Then, it is assumed that the PDF can be approximated between grid vertices by the (multidimensional) linear interpolant. With this assumption, random samples can be efficiently drawn via inverse transform sampling [@devroye.book]. 
 
 `lintsampler` is primarily written with `numpy`, drawing some additional functionality from `scipy`. Under the most basic usage of `lintsampler`, the user provides a PDF function and some parameters describing a grid-like structure to the `LintSampler` class, and is then able to draw samples via the `sample` method. Additionally, there is functionality for the user to set the random seed, employ quasi-Monte Carlo sampling, or sample within a premade grid (`DensityGrid`) or tree (`DensityTree`) structure.
 
