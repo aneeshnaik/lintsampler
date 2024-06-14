@@ -19,7 +19,13 @@ nb_execution_timeout = 120
 numpydoc_class_members_toctree = False
 
 # set the logo
-html_logo = "assets/lintsamplerlogo.png"  
+html_theme_options = {
+   "logo": {
+      "image_light": "assets/lintsamplerlogo.png",
+      "image_dark": "assets/lintsamplerlogodark.png",
+   }
+}
 
-# set favicon: update later? also make dark version
+# set favicon: update later?
 html_favicon = "assets/lintsamplerlogo.png"
+
