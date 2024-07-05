@@ -40,6 +40,7 @@ Making a histogram of the resulting samples and comparing to the input density f
 
 installation
 usage
+whentouse
 lintsampler
 densitystructure
 densitygrid
