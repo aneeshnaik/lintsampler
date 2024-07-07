@@ -38,6 +38,33 @@ For a small number of well-studied PDFs, optimised algorithms exist to draw samp
 
 We anticipate `lintsampler` finding use in many applications in scientific research and other areas underpinned by statistics. In such fields, pseudo-random sampling fulfils a myriad of purposes, such as Monte Carlo integration, Bayesian inference, or the generation of initial conditions for numerical simulations. The linear interpolant sampling algorithm underpinning `lintsampler` is a simple and effective alternative to existing techniques, and has no publicly available implementation at present.
 
+# Usage
+
+`lintsampler` is designed with a interface that makes sampling from an input PDF straightforward. For example, if you have PDF with multiple separated peaks:
+
+```python
+import numpy as np
+from scipy.stats import norm
+
+def gmm_pdf(x):
+    mu = np.array([-3.0, 0.5, 2.5])
+    sig = np.array([1.0, 0.25, 0.75])
+    w = np.array([0.4, 0.25, 0.35])
+    return np.sum([w[i] * norm.pdf(x, mu[i], sig[i]) for i in range(3)], axis=0)
+```
+
+`lintsampler` can efficiently draw samples from it on some defined interval:
+
+```python
+from lintsampler import LintSampler
+
+grid = np.linspace(-7,7,100)
+samples = LintSampler(grid,pdf=gmm_pdf).sample(N=10000)
+```
+
+`samples` is then an array of 10000 samples drawn from the PDF. Apart from defining the PDF, `lintsampler` enables creating discrete samples from a continuous PDF in a small handful of lines.
+
+
 # Features
 
 Although `lintsampler` is written in pure Python, making the code highly readable, the methods make extensive use of `numpy` functionality to provide rapid sampling. After the structure spanning the domain has been constructed, sampling proceeds with computational effort scaling linearly with number of sample points. 

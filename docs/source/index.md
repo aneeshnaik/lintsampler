@@ -25,7 +25,7 @@ def gmm_pdf(x):
 ```python
 from lintsampler import LintSampler
 
-grid = np.linspace(-12,12,100)
+grid = np.linspace(-7,7,100)
 samples = LintSampler(grid,pdf=gmm_pdf).sample(N=10000)
 ```
 
