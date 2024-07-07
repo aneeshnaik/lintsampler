@@ -45,6 +45,7 @@ lintsampler
 densitystructure
 densitygrid
 densitytree
+contributing
 attribution
 license
 ```

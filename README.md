@@ -61,6 +61,10 @@ See [this page of the documentation](https://lintsampler.readthedocs.io/en/lates
 
 Complete documentation, including more example notebooks, is available at [lintsampler.readthedocs.io/](https://lintsampler.readthedocs.io/).
 
+## Contributing
+
+The `lintsampler` maintainers welcome contributions to software, examples, and documentation. The maintainers are actively monitoring pull requests and would be happy to collaborate on contributions or ideas. If you have any requests for additional information or find any bugs, please open an issue directly.
+
 ## Attribution
 
 If using `lintsampler` for a research publication, please cite our [paper](https://github.com/aneeshnaik/lintsampler/blob/main/paper/paper.pdf).
