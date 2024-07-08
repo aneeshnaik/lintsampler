@@ -34,6 +34,7 @@ If you have a density function, such as this multi-modal 1d pdf with the bulk of
 
 ```python
 import numpy as np
+from scipy.stats import norm
 
 def gmm_pdf(x):
     mu = np.array([-3.0, 0.5, 2.5])
@@ -59,6 +60,10 @@ See [this page of the documentation](https://lintsampler.readthedocs.io/en/lates
 ## Documentation
 
 Complete documentation, including more example notebooks, is available at [lintsampler.readthedocs.io/](https://lintsampler.readthedocs.io/).
+
+## Contributing
+
+The `lintsampler` maintainers welcome contributions to software, examples, and documentation. The maintainers are actively monitoring pull requests and would be happy to collaborate on contributions or ideas. If you have any requests for additional information or find any bugs, please open an issue directly.
 
 ## Attribution
 

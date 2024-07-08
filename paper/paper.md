@@ -25,9 +25,9 @@ bibliography: paper.bib
 
 # Summary
 
-`lintsampler` provides a Python implementation of a technique we term 'linear interpolant sampling': an algorithm to efficiently draw pseudo-random samples from an arbitrary PDF. First, the PDF is evaluated on a grid-like structure. Then, it is assumed that the PDF can be approximated between grid vertices by the (multidimensional) linear interpolant. With this assumption, random samples can be efficiently drawn via inverse transform sampling [@devroye.book]. 
+`lintsampler` provides a Python implementation of a technique we term 'linear interpolant sampling': an algorithm to efficiently draw pseudo-random samples from an arbitrary probability density function (PDF). First, the PDF is evaluated on a grid-like structure. Then, it is assumed that the PDF can be approximated between grid vertices by the (multidimensional) linear interpolant. With this assumption, random samples can be efficiently drawn via inverse transform sampling [@devroye.book]. 
 
-`lintsampler` is primarily written with `numpy`, drawing some additional functionality from `scipy`. Under the most basic usage of `lintsampler`, the user provides a PDF function and some parameters describing a grid-like structure to the `LintSampler` class, and is then able to draw samples via the `sample` method. Additionally, there is functionality for the user to set the random seed, employ quasi-Monte Carlo sampling, or sample within a premade grid (`DensityGrid`) or tree (`DensityTree`) structure.
+`lintsampler` is primarily written with `numpy` [@numpy.paper], drawing some additional functionality from `scipy` [@scipy.paper]. Under the most basic usage of `lintsampler`, the user provides a Python function defining the target PDF and some parameters describing a grid-like structure to the `LintSampler` class, and is then able to draw samples via the `sample` method. Additionally, there is functionality for the user to set the random seed, employ quasi-Monte Carlo sampling, or sample within a premade grid (`DensityGrid`) or tree (`DensityTree`) structure.
 
 
 # Statement of need
@@ -81,11 +81,38 @@ This is a scenario that satisfies all four of the use cases list above. To expla
 For these reasons, this kind of astrophysical simulation code provides an excellent example of a 'real world' application for `lintsampler`. Here, one would cover the simulation domain with a `DensityTree` instance (or several instances, one for each primary structure), call the `refine` method to better resolve the high-density regions, then feed the tree to a `LintSampler` instance and call `sample` to generate particles. The `qmc` flag can be passed to the sampler in order to employ Quasi-Monte Carlo sampling.
 
 <!-- 
-For a small number of well-studied probability distributions, optimised algorithms exist to draw samples cheaply. However, one often wishes to draw samples from an arbitrary PDF for which no such algorithm is available. In such situations, the method of choice is typically some flavour of Markov Chain Monte Carlo (MCMC), a powerful class of methods with many excellent Python implementations [@emcee.paper;@pymc.paper;@sgmcmcjax.paper;@pxmcmc.paper]. One drawback of MCMC techniques is that they typically require a degree of tuning during the setup (e.g. choice of proposal distribution, initial walker positions, etc.), and a degree of inspection afterward to check for convergence. This additional work is a price worth paying for many use cases, but can feel excessive in scenarios where the user is less concerned with strict sampling accuracy or minimising PDF evaluations, and would prefer a simpler means to generate an approximate sample.
+For a small number of well-studied PDFs, optimised algorithms exist to draw samples cheaply. However, one often wishes to draw samples from an arbitrary PDF for which no such algorithm is available. In such situations, the method of choice is typically some flavour of Markov chain Monte Carlo (MCMC), a powerful class of methods with many excellent Python implementations [@emcee.paper;@pymc.paper;@sgmcmcjax.paper;@pxmcmc.paper]. One drawback of MCMC techniques is that they typically require a degree of tuning during the setup (e.g. choice of proposal distribution, initial walker positions, etc.), and a degree of inspection afterward to check for convergence. This additional work is a price worth paying for many use cases, but can feel excessive in scenarios where the user is less concerned with strict sampling accuracy or minimising PDF evaluations, and would prefer a simpler means to generate an approximate sample.
 
-`lintsampler` was designed with such situations in mind. In the simplest use case, the user need only provide a PDF function and some one-dimensional arrays representing a grid, and a set of samples will be generated. Compared with MCMC, there is rather less work involved on the part of the user, but there compensating disadvantages. First, some care needs to be taken to ensure the grid has sufficient resolution for the use case. Second, in high dimensional scenarios with finely resolved grids, the PDF might well be evaluated many more times than with MCMC.
+`lintsampler` was designed with such situations in mind. In the simplest use case, the user need only provide a Python function defining the target PDF and some one-dimensional arrays representing a grid, and a set of samples will be generated. Compared with MCMC, there is rather less work involved on the part of the user, but there compensating disadvantages. First, some care needs to be taken to ensure the grid has sufficient resolution for the use case. Second, in high dimensional scenarios with finely resolved grids, the PDF might well be evaluated many more times than with MCMC.
 
 We anticipate `lintsampler` finding use in many applications in scientific research and other areas underpinned by statistics. In such fields, pseudo-random sampling fulfils a myriad of purposes, such as Monte Carlo integration, Bayesian inference, or the generation of initial conditions for numerical simulations. The linear interpolant sampling algorithm underpinning `lintsampler` is a simple and effective alternative to existing techniques, and has no publicly available implementation at present. -->
+
+# Usage
+
+`lintsampler` is designed with a interface that makes sampling from an input PDF straightforward. For example, if you have PDF with multiple separated peaks:
+
+```python
+import numpy as np
+from scipy.stats import norm
+
+def gmm_pdf(x):
+    mu = np.array([-3.0, 0.5, 2.5])
+    sig = np.array([1.0, 0.25, 0.75])
+    w = np.array([0.4, 0.25, 0.35])
+    return np.sum([w[i] * norm.pdf(x, mu[i], sig[i]) for i in range(3)], axis=0)
+```
+
+`lintsampler` can efficiently draw samples from it on some defined interval:
+
+```python
+from lintsampler import LintSampler
+
+grid = np.linspace(-7,7,100)
+samples = LintSampler(grid,pdf=gmm_pdf).sample(N=10000)
+```
+
+`samples` is then an array of 10000 samples drawn from the PDF. Apart from defining the PDF, `lintsampler` enables creating discrete samples from a continuous PDF in a small handful of lines.
+
 
 # Features
 

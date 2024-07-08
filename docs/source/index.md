@@ -11,6 +11,7 @@ For example, if you have a density function, such as this multi-modal 1d pdf wit
 
 ```python
 import numpy as np
+from scipy.stats import norm
 
 def gmm_pdf(x):
     mu = np.array([-3.0, 0.5, 2.5])
@@ -24,7 +25,7 @@ def gmm_pdf(x):
 ```python
 from lintsampler import LintSampler
 
-grid = np.linspace(-12,12,100)
+grid = np.linspace(-7,7,100)
 samples = LintSampler(grid,pdf=gmm_pdf).sample(N=10000)
 ```
 
@@ -45,6 +46,7 @@ lintsampler
 densitystructure
 densitygrid
 densitytree
+contributing
 attribution
 license
 ```
