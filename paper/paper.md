@@ -32,11 +32,11 @@ bibliography: paper.bib
 
 # Statement of need
 
-Below is a (non-exhaustive) list of 'use cases', i.e., situations where a user might find `lintsampler` (and/or the the linear interpolant sampling algorithm underpinning it) to be preferable over other random sampling techniques. This page closely mirrors the 'Statement of Need' section of our [JOSS paper](https://joss.theoj.org/papers/133f9681a79ab47b916ecee9e183be9e).
+Below is a (non-exhaustive) list of 'use cases', i.e., situations where a user might find `lintsampler` (and/or the the linear interpolant sampling algorithm underpinning it) to be preferable over other random sampling techniques.
 
 In all of these use cases, it is assumed that the dimension of the problem is not too high. `lintsampler` works by evaluating a given PDF on the nodes of a grid (or grid-like structure, such as a tree), so the number of evaluations (and memory occupancy) grows exponentially with the number of dimensions. As a consequence, many of the efficiency arguments given for `lintsampler` below don't apply to higher dimensional problems. We probably wouldn't use `lintsampler` in more than 6 dimensions, but there is no hard limit here: the question of how many dimensions is too many will depend on the problem at hand. 
 
-A second assumption made below is that the target PDF the user wishes to sample from does not have its own exact sampling algorithm (such as the [Box-Muller transform](https://en.wikipedia.org/wiki/Box-Muller_transform) for a Gaussian PDF). The power of `lintsampler` lies in its applicability to arbitrary PDFs for which tailor-made sampling algorithms are not available.
+A second assumption made below is that the target PDF the user wishes to sample from does not have its own exact sampling algorithm (such as the Box-Muller transform for a Gaussian PDF). The power of `lintsampler` lies in its applicability to arbitrary PDFs for which tailor-made sampling algorithms are not available.
 
 
 ## Use Cases
