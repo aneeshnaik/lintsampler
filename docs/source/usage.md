@@ -1,4 +1,4 @@
-# Usage
+# How to Use `lintsampler`
 
 `lintsampler` has one public sampling class: `LintSampler`.
 

@@ -2,7 +2,7 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - sphinx=7.2
+  - sphinx
   - sphinx-book-theme
   - numpy
   - numpydoc
@@ -11,3 +11,4 @@ dependencies:
   - matplotlib
   - scipy
   - scikit-learn
+  - emcee
