@@ -46,7 +46,6 @@ lintsampler
 densitystructure
 densitygrid
 densitytree
-contributing
 attribution
 license
 ```
@@ -72,4 +71,5 @@ theory/preamble.md
 theory/inverse_sampling
 theory/linear_interpolant.md
 theory/worked_example.md
+theory/error_scaling.md
 ```
