@@ -59,7 +59,7 @@ If the target PDF has a very large dynamic range, then the `DensityTree` object 
 
 ### 4. Noise needs to be minimised
 
-In Quasi-Monte Carlo (QMC) sampling, one purposefully generates more 'balanced' (and thus less random) draws from a target PDF, so that sampling noise decreases faster than $N^{-1/2}$. `lintsampler` allows easy QMC sampling with arbitrary PDFs. We are not aware of such capabilities with any other package. We give an example of using `lintsampler` for QMC in the [fourth example notebook](https://lintsampler.readthedocs.io/en/latest/example_notebooks/4_qmc.html) in the `lintsampler` docs.
+In Quasi-Monte Carlo (QMC) sampling, one purposefully generates more 'balanced' (and thus less random) draws from a target PDF, so that sampling noise decreases faster than $\mathcal{O}(N^{-1/2})$. `lintsampler` allows easy QMC sampling with arbitrary PDFs. We are not aware of such capabilities with any other package. We give an example of using `lintsampler` for QMC in the [fourth example notebook](https://lintsampler.readthedocs.io/en/latest/example_notebooks/4_qmc.html) in the `lintsampler` docs.
 
 
 ## 'Real World' Example
@@ -86,7 +86,7 @@ In all use cases listed above, it is assumed that the dimension of the problem i
 
 # Usage
 
-`lintsampler` is designed with a interface that makes sampling from an input PDF straightforward. For example, if you have PDF with multiple separated peaks:
+`lintsampler` is designed with an interface that makes sampling from an input PDF straightforward. For example, if you have PDF with multiple separated peaks:
 
 ```python
 import numpy as np
