@@ -7,10 +7,13 @@
 [![Coverage Status](https://coveralls.io/repos/github/aneeshnaik/lintsampler/badge.svg?branch=main&kill_cache=1)](https://coveralls.io/github/aneeshnaik/lintsampler?branch=main)
 [![Documentation Status](https://readthedocs.org/projects/lintsampler/badge/?version=latest)](https://lintsampler.readthedocs.io/en/latest/?badge=latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/aneeshnaik/lintsampler/blob/main/LICENSE)
+[![status](https://joss.theoj.org/papers/133f9681a79ab47b916ecee9e183be9e/status.svg)](https://joss.theoj.org/papers/133f9681a79ab47b916ecee9e183be9e)
 
 When you have a density function, but you would like to create a set of sample points from that density function, you can use _linear interpolate sampling_. Using the evaluation of the density at the two endpoints of 1D interval, or the four corners of a 2D rectangle, or generally the $2^k$ vertices of a $k$-dimensional hyperbox (or a series of such hyperboxes, e.g., the cells of a $k$-dimensional grid), linear interpolant sampling is a technique to draw random samples within the hyperbox. `lintsampler` provides a Python implementation of this.
 
-See the [documentation](https://lintsampler.readthedocs.io/) or our [paper](https://github.com/aneeshnaik/lintsampler/blob/main/paper/paper.pdf) for further details. 
+See the [documentation](https://lintsampler.readthedocs.io/) for further details.
+
+This package was also reviewed for the Journal of Open Source Software (JOSS). See the paper [here](https://joss.theoj.org/papers/133f9681a79ab47b916ecee9e183be9e) and the review thread [here](https://github.com/openjournals/joss-reviews/issues/6906).
 
 ## Installation
 
@@ -67,7 +70,7 @@ The `lintsampler` maintainers welcome contributions to software, examples, and d
 
 ## Attribution
 
-If using `lintsampler` for a research publication, please cite our [paper](https://github.com/aneeshnaik/lintsampler/blob/main/paper/paper.pdf).
+If using `lintsampler` for a research publication, please cite our [paper](https://joss.theoj.org/papers/133f9681a79ab47b916ecee9e183be9e). 
 
 ## License
 
