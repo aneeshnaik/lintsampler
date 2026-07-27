@@ -1,6 +1,6 @@
 numpy>=1.17
 scipy>=1.12
-pytest>=9.0
+pytest>=9.1
 coverage>=7.14
 coveralls>=4.1
 -e .
